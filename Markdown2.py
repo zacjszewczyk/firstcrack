@@ -32,6 +32,10 @@ class Markdown:
     # Return:
     # - Parsed line. (String)
     def __parseInlineMD(self, __line):
+        # Add a <br /> if three or more trailing spaces.
+        if ((len(__line) - len(__line.rstrip(' '))) > 2):
+            __line = __line.strip() + "<br />"
+        
         # Parser tracks leading whitespace, so remove it.
         __line = __line.strip()
 
