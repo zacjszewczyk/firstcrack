@@ -16,6 +16,7 @@ Given a directory of a thousand [Markdown](http://daringfireball.net/projects/ma
 * [Making a New Post](#making-a-new-post)
 * [Editing an Existing Post](#editing-an-existing-post)
 * [Editing an Existing Page](#editing-an-existing-page)
+* [Deploying Your Website](#deploying-your-website)
 * [Background and Motivation](#background-and-motivation)
 * [License](#license)
 
