@@ -146,15 +146,17 @@ YourDomain.com
 
 ## Advanced Usage
 
-First Crack has a few advanced features that make managing a website easier, which are accessible in the "Authoring" mode. To enter "Authoring" mode, use the following command:
+First Crack has a few advanced features that make managing a website easier, which are accessible in the "Authoring" mode. To enter "Authoring" mode, use one of the following commands:
 
 ```
+$ make author
 $ ./blog.py -a
 ```
 
-First Crack will display a menu of available commands, along with an explanation of each. Enter `-h` at any time to view the help menu. First Crack will continue prompting you for input in this mode until you exit it with either `exit` or `!exit`. You can also run any of these commands directly from the command line. For example, to clear all structure files and rebuilt the entire site, use the following command:
+First Crack will display a menu of available commands, along with an explanation of each. Enter `-h` at any time to view the help menu. First Crack will continue prompting you for input in this mode until you exit it with either `exit` or `!exit`. You can also run any of these commands directly from the command line. For example, to clear all structure files and rebuilt the entire site, use one of the following commands:
 
 ```
+$ make rebuild
 $ ./blog.py -R
 ```
 
