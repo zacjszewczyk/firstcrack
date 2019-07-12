@@ -526,10 +526,10 @@ def Init():
     # Make global variables accessible
     global base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url
 
-    # Check for the existence of an "EDITME" file, which contains config info.
+    # Check for the existence of a ".config" file, which contains config info.
     # On error, notify the user, create the file, and prompt the user to fill it out.
-    if (not isfile("./EDITME")):
-        stdout.write(c.FAIL+"The FirstCrack config file, './EDITME', does not exist. Would you like to create it now?\n"+c.ENDC)
+    if (not isfile("./.config")):
+        stdout.write(c.FAIL+"The FirstCrack config file, './.config', does not exist. Would you like to create it now?\n"+c.ENDC)
         res = GetUserInput("(y/n) # ")
 
         while (res != "y" and res != "n"):
@@ -553,9 +553,8 @@ def Init():
             meta_appname = GetUserInput("App name: ")
             twitter_url = GetUserInput("Twitter URL: ")
             insta_url = GetUserInput("Instagram URL: ")
-            fd = open("./EDITME", "w")
-            fd.write("# FirstCrack configuration document\n# The following variables are required:\n## base_url - The base URL for your website, i.e. https://zacs.site\n## byline - The name of the author, as it will display on all posts\n## full_name - The full, legal name of the content owner.\n## meta_keywords - Any additional keywords you would like to include in the META keywords tag\n## meta_appname - The desired app name, stored in a META tag\n## twitter - URL to your Twtitter profile\n## instagram - URL to your Instagram profile\nbase_url = %s\nbyline = %s\nfull_name = %s\nmeta_keywords = %s\nmeta_appname = %s\ntwitter = %s\ninstagram = %s" % (base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url))
-            fd.close()
+            with open("./.config", "w") as fd:
+                fd.write("# FirstCrack configuration document\n# The following variables are required:\n## base_url - The base URL for your website, i.e. https://zacs.site\n## byline - The name of the author, as it will display on all posts\n## full_name - The full, legal name of the content owner.\n## meta_keywords - Any additional keywords you would like to include in the META keywords tag\n## meta_appname - The desired app name, stored in a META tag\n## twitter - URL to your Twtitter profile\n## instagram - URL to your Instagram profile\nbase_url = %s\nbyline = %s\nfull_name = %s\nmeta_keywords = %s\nmeta_appname = %s\ntwitter = %s\ninstagram = %s" % (base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url))
         elif (res == "n"):
             print(c.FAIL+"Configuration file not created."+c.ENDC)
             print(c.WARNING+"Please run again."+c.ENDC)
@@ -563,8 +562,8 @@ def Init():
 
     # On success, extract values and store them for use when building the site.
     else:
-        # Open the './EDITME' file
-        with open("./EDITME", "r") as fd:
+        # Open the './.config' file
+        with open("./.config", "r") as fd:
             for line in fd:
                 if (line[0] == "#"): # Ignore comments
                     pass
@@ -585,10 +584,10 @@ def Init():
 
     # If any of these values were blank, notify the user and throw an error.
     if (base_url == "" or byline == "" or full_name == ""):
-        print(c.FAIL+"Error reading settings from './EDITME'. Please check file configuration and try again."+c.ENDC)
+        print(c.FAIL+"Error reading settings from './.config'. Please check file configuration and try again."+c.ENDC)
         exit(1)
     elif (meta_keywords == "" or meta_appname == "" or twitter_url == "" or insta_url == ""):
-        print(c.WARNING+"You have not finished initializing the configuration file. Please finish setting up './EDITME'.")
+        print(c.WARNING+"You have not finished initializing the configuration file. Please finish setting up './.config'.")
 
     # Check for existence of system files and Content directory.
     # These are requirements for First Crack; it will fail if they do not exist.
