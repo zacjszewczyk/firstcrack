@@ -31,9 +31,14 @@ weekDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
 content = ""
 md = ""
 
-# Config variables, read in from './EDITME'
-## - base_url: Base website URL (String)
-## - byline: Author name, as it will appear on all articles (String)
+# Config variables, read in from './.config'
+## - base_url: The base domain name for your website, i.e. https://zacs.site"). (String)
+## - byline: The name of the author, as you want it to display on all blog posts. (String)
+## - full_name: The full, legal name of the content owner, used to generate the copyright notice. (String)
+## - meta_keywords: Any keywords you would like a search engine to use to send visitors to your website. (String)
+## - meta_appname: The app name a user will see if they save your website to their home screen. (String)
+## - twitter_url: The URL to your Twtitter profile. (String)
+## - instagram_url: The URL to your Instagram profile. (String)
 base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url = "", "", "", "", "", "", ""
 
 # Method: AppendContentOfXToY
