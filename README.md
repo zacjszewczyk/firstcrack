@@ -177,6 +177,16 @@ To edit an existing post, just edit the text file in the `Content` directory, th
 
 First Crack ships with a handful of static pages that live in the `system` folder: `index.html`, `projects.html`, `disclaimers.html`, and `template.htm`. When it builds a website, First Crack gets content for the home page from `index.html`, content for the projects page from `projects.html`, and content for the disclaimers page from `disclaimers.html`. If you want to change any of them, then, just edit those files. Put any JavaScript snippets above the `<!-- DIVIDER -->` line, and the HTML content below it. 
 
+## Deploying Your Website
+
+If you followed [my guide to running your own website for free with First Crack and Google Firebase](https://zacs.site/blog/how-to-own-your-platform.html), you can use the simple `make deploy` command to deploy it. This command will also check for a local source control repository and update it with a generic timestamped commit message. My workflow for a new post looks something like this:
+
+```
+$ make # Once I add a new article to the Content folder, this updates the site.
+$ make preview # One last check for spelling or other formatting errors. This command opens the home page in my default browser.
+$ make deploy # Deploy the updated site, update the local source control repository, and push that change to GitHub and Bitbucket.
+```
+
 ## Background and Motivation
 
 I started this project in 2011. After trying many of the day's most popular content management systems, I decided to roll my own. I began running my website on something I called First Crack a few months later. Over the years, that project morphed into the one you see before you today.
