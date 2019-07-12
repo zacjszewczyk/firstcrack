@@ -56,6 +56,7 @@ On install, First Crack consists of this README, five Python scripts, a `system`
 ```
 FirstCrack
 |____README.md # This file.
+|____makefile # A simplified command line interface for First Crack.
 |____blog.py # The blog engine.
 |____Markdown.py # The Markdown parser.
 |____colors.py # ASCII color code function.
