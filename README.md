@@ -36,7 +36,7 @@ Given a directory of a thousand [Markdown](http://daringfireball.net/projects/ma
 
 ## Dependencies
 
-First Crack does not rely on any third-party tools, code, or frameworks. It uses Python 3.7.3, although you may have to adjust the path to the Python binary. Thanks to a bug in my development environment, I have to point my Python 3 projects to `#!/usr/local/bin/python3` rather than the usual `#!/usr/bin/python3`. If you have Python 3 installed alongside Python 2 in the `/usr/bin/` directory, simply change the first line of the Python files in this project to `#!/usr/bin/python3`.
+First Crack does not rely on any third-party tools, code, or frameworks. It uses Python 2 or 3, based on whatever you have on your system. 
 
 ## Installation
 
