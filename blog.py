@@ -565,6 +565,10 @@ def Init():
             print(c.WARNING+"Please run again."+c.ENDC)
             exit(0)
 
+        # Remove the migration script.
+        if (isfilee("./.sys.sh")):
+            remove("./.sys.sh")
+
     # On success, extract values and store them for use when building the site.
     else:
         # Open the './.config' file
