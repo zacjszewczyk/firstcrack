@@ -78,6 +78,7 @@ help:
 	@echo "First Crack will now prompt you to create the config file. Proceed by entering 'y' at the prompt."
 	@echo
 	@chmod 755 blog.py
+	@touch -m -t 200012312359.59 "./Content/Test Linkpost.txt"
 
 # Rule: pull
 # Purpose: Pull changes from remote repo.
