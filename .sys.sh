@@ -51,6 +51,9 @@ else
             search='print('
             replace='print ('
             migrate_python "$search" "$replace"
+            search='input('
+            replace='raw_input('
+            migrate_python "$search" "$replace"
             printf $OKGREEN"Done.\n"$ENDC
         fi
     fi
