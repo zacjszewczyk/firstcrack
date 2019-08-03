@@ -34,7 +34,8 @@ else
   printf $FAIL"Python 3 not found.$ENDC\n"
   printf $WARNING"Testing Python generic installation ... "$ENDC
   if which python | grep -q 'python' ; then
-    printf $OKGREEN"'python' found. Editing path to executable ... "$ENDC
+    printf $OKGREEN"'python' found.\n"$ENDC
+    printf $WARNING"Editing path to executable ... "$ENDC
     search="#!/usr/local/bin/python3"
     replace="#!"$(which python)
     migrate_python $search $replace
@@ -46,11 +47,11 @@ else
         printf $OKGREEN"Found generic Python 3. No further modifications necessary."$ENDC
     else
         if [[ $out == *"2."* ]] ; then
-            printf $WARNING"Found generic Python 2. Script modification necessary. "$ENDC
+            printf $WARNING"Found generic Python 2. Script modification necessary ... "$ENDC
             search='print('
             replace='print ('
             migrate_python "$search" "$replace"
-            printf $OKGREEN"Done."$ENDC
+            printf $OKGREEN"Done.\n"$ENDC
         fi
     fi
   else
