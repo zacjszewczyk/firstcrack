@@ -38,7 +38,7 @@ else
     search="#!/usr/local/bin/python3"
     replace="#!"$(which python)
     migrate_python $search $replace
-    printf $OKGREEN"Done."$ENDC
+    printf $OKGREEN"Done.\n"$ENDC
 
     echo "Testing Python generic version ... "
     out=$(python -c "from sys import version; print version")
@@ -46,10 +46,11 @@ else
         printf $OKGREEN"Found generic Python 3. No further modifications necessary."$ENDC
     else
         if [[ $out == *"2."* ]] ; then
-            printf $WARNING"Found generic Python 2. Script modification necessary.\n"$ENDC
+            printf $WARNING"Found generic Python 2. Script modification necessary. "$ENDC
             search='print('
             replace='print ('
             migrate_python "$search" "$replace"
+            printf $OKGREEN"Done."$ENDC
         fi
     fi
   else
