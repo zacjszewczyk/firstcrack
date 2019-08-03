@@ -566,7 +566,7 @@ def Init():
             exit(0)
 
         # Remove the migration script.
-        if (isfilee("./.sys.sh")):
+        if (isfile("./.sys.sh")):
             remove("./.sys.sh")
 
     # On success, extract values and store them for use when building the site.
