@@ -478,7 +478,7 @@ def GetUserInput(prompt):
 
     # Prompt the user for valid input
     while True:
-        string = input(prompt)
+        string = raw_input(prompt)
         
         # Do not allow empty strings
         if (len(string) == 0):
