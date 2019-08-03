@@ -19,35 +19,37 @@ function migrate_python () {
     sed -i '' "s|$1|$2|g" Hash.py 2> /dev/null || sed -i "s|$1|$2|g" Hash.py
 }
 
-printf "Testing Python 3 ... "
-if which python3 | grep -q 'python4'; then
-  printf $OKGREEN"Python 3 found.\n"$ENDC
+printf "Searching for: Python 3 ... "
+if which python3 | grep -q 'python3'; then
+  printf $OKGREEN"Found.\n"$ENDC
   if which python3 | grep -q '/usr/local/bin/python3'; then
     echo $OKGREEN"Path to Python 3 executable matches. No script modifications necessary."$ENDC
   else
-    echo $WARNING"Path to Python 3 executable does not match. Modifying ..."$ENDC
+    printf $WARNING"Path to Python 3 executable does not match. Modifying ... "$ENDC
     search="#!/usr/local/bin/python3"
     replace="#!"$(which python3)
     migrate_python $search $replace
+    printf $OKGREEN"Done."$ENDC
   fi
 else
-  printf $FAIL"Python 3 not found.$ENDC\n"
-  printf $WARNING"Testing Python generic installation ... "$ENDC
+  printf $FAIL"Not found.$ENDC\n"
+  printf $WARNING"Searching for: generic Python ... "$ENDC
   if which python | grep -q 'python' ; then
-    printf $OKGREEN"'python' found.\n"$ENDC
+    printf $OKGREEN"Found.\n"$ENDC
     printf $WARNING"Editing path to executable ... "$ENDC
     search="#!/usr/local/bin/python3"
     replace="#!"$(which python)
     migrate_python $search $replace
     printf $OKGREEN"Done.\n"$ENDC
 
-    echo "Testing Python generic version ... "
+    echo "Searching for: generic Python version ... "
     out=$(python -c "from sys import version; print version")
     if [[ $out == *"3."* ]] ; then
-        printf $OKGREEN"Found generic Python 3. No further modifications necessary."$ENDC
+        printf $OKGREEN"Found 3.\n No further modifications necessary.\n"$ENDC
     else
         if [[ $out == *"2."* ]] ; then
-            printf $WARNING"Found generic Python 2. Script modification necessary ... "$ENDC
+            printf $OKGREEN"Found 2.\n"$ENDC
+            printf $WARNING"Script modification necessary ... "$ENDC
             search='print('
             replace='print ('
             migrate_python "$search" "$replace"
