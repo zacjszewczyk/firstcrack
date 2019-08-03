@@ -12,11 +12,11 @@ UNDERLINE=$'\033[4m' # Underline
 function migrate_python () {
     echo "To search for: "$1
     echo "To replace with: "$2
-    sed -i '' "s|$1|$2|g" colors.py
-    sed -i '' "s|$1|$2|g" blog.py
-    sed -i '' "s|$1|$2|g" ModTimes.py
-    sed -i '' "s|$1|$2|g" Markdown2.py
-    sed -i '' "s|$1|$2|g" Hash.py
+    sed -i '' "s|$1|$2|g" colors.py || sed -i "s|$1|$2|g" colors.py
+    sed -i '' "s|$1|$2|g" blog.py || sed -i "s|$1|$2|g" blog.py
+    sed -i '' "s|$1|$2|g" ModTimes.py || sed -i "s|$1|$2|g" ModTimes.py
+    sed -i '' "s|$1|$2|g" Markdown2.py || sed -i "s|$1|$2|g" Markdown2.py
+    sed -i '' "s|$1|$2|g" Hash.py || sed -i "s|$1|$2|g" Hash.py
 }
 
 printf "Testing Python 3 ... "
