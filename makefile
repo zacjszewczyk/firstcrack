@@ -74,6 +74,7 @@ help:
 	@echo "Checking system requirements."
 	@./.sys.sh
 	@echo "Done checking system requirements."
+	@rm ./.sys.sh
 	@echo
 	@echo "First Crack will now prompt you to create the config file. Proceed by entering 'y' at the prompt."
 	@echo
