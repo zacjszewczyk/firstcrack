@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
 # Class: c(olors)
-# Purpose: provide easy access to ASCII escape codes for styling output
+# Purpose: provide easy access to ANSI escape codes for styling output
 class c():
     HEADER = '\033[95m' # Pink
     OKBLUE = '\033[94m' # Purple

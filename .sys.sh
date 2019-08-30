@@ -21,7 +21,7 @@ function migrate_python () {
 
 printf "Searching for: Python 3 ... "
 if which python3 | grep -q 'python3'; then
-  printf $OKGREEN"Found.\n"$ENDC
+  printf $OKGREEN"found.\n"$ENDC
   if which python3 | grep -q '/usr/local/bin/python3'; then
     echo $OKGREEN"Path to Python 3 executable matches. No script modifications necessary."$ENDC
   else
@@ -29,7 +29,7 @@ if which python3 | grep -q 'python3'; then
     search="#!/usr/local/bin/python3"
     replace="#!"$(which python3)
     migrate_python $search $replace
-    printf $OKGREEN"Done."$ENDC
+    printf $OKGREEN"Done.\n"$ENDC
   fi
 else
   printf $FAIL"Not found.$ENDC\n"

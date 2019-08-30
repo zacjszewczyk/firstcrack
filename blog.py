@@ -1,34 +1,28 @@
 #!/usr/local/bin/python3
 
 # Imports
-# Todo: Only import functions from modules that I actually need, not entire module
 from os import listdir, stat, remove, utime, mkdir # File/folder operations
-from os.path import isdir, isfile # File existence operations
-from time import strptime, strftime, mktime, localtime, gmtime # Managing file modification time
+from os.path import isdir, isfile # File/folder existence operations
+from time import strptime, strftime, mktime, localtime, gmtime # Managing file mod time
 import datetime # Recording runtime
 from re import search # Regex
-from sys import exit, argv, stdout # Command line options
-from Markdown2 import Markdown
-from ModTimes import CompareMtimes
-from colors import c
+from sys import exit, argv, stdout, stdin # Command line options
+from Markdown2 import Markdown # Markdown parser
+from ModTimes import CompareMtimes # Compare file mod times
+from colors import c # Output styling
+from multiprocessing import Pool # Multiprocessing
+from random import choices # Building Explore page
 
 # Global variables
-## - types: Keep track of current and two previous line types. (Tuple)
-## - active: Keep track of active block-level HTML element. (String)
-## - file_idx: Current file number. (Int)
 ## - files: Dictionary with years as the keys, and sub-dictinaries as the 
 ##          elements. These elements have months as the keys, and a list
 ##          of the posts made in that month as the elements. (Dictionary)
-## - months: A dictionary for converting decimal (string) representations
-##           of months to their names. (Dictionary)
 ## - content: A string with the opening and closing HTML tags. (String)
-types = ["", "", ""]
-active = ""
-file_idx = 0
+## - months: A map of month numbers to names (Dictionary)
+## - md: Placeholder for instance of Markdown parser. (Class)
 files = {}
-months = {"01":"January","02":"February","03":"March","04":"April","05":"May","06":"June","07":"July","08":"August","09":"September","10":"October","11":"November","12":"December"}
-weekDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
 content = ""
+months = {"01":"January","02":"February","03":"March","04":"April","05":"May","06":"June","07":"July","08":"August","09":"September","10":"October","11":"November","12":"December"}
 md = ""
 
 # Config variables, read in from './.config'
@@ -75,17 +69,12 @@ def AppendContentOfXToY(target, source, timestamp):
 
         # Iterate over each line of the source structure file.
         for i, line in enumerate(source_fd):
-            # Strip whitespace
-            # line = line.strip()
-
-            # print(i,":",line)
-
             # Check the first two lines of the structure file for a
             # class tag denoting the type of article. If viewing an
             # original article, truncate it at the first paragraph by
             # setting the flag, "flag", to False
             if (i <= 1):
-                if ("class=\"original\"" in line):
+                if ('class="original"' in line):
                     flag = False
                     line = line.replace("href=\"", "href=\"blog/")
             elif (i == 3):
@@ -111,6 +100,8 @@ def AppendContentOfXToY(target, source, timestamp):
     target_fd.write("\n    <p class='read_more_paragraph'>\n        <a style='text-decoration:none;' href='blog/%s'>&#x24E9;</a>\n    </p>" % (html_filename))
     target_fd.write("</article>")
     target_fd.close()
+
+    del html_filename, flag, target_fd
 
 # Method: AppendToFeed
 # Purpose: Append the content of a source file to the RSS feed.
@@ -140,7 +131,6 @@ def AppendToFeed(source):
     feed_fd.write("        <item>\n")
 
     with open("./local/blog/"+html_filename, "r") as source_fd:
-        
         # Skip to the <article tag, then write the opening <article>
         # tag to the output file.
         for line in source_fd:
@@ -171,7 +161,7 @@ def AppendToFeed(source):
             elif (i == 1):
                 continue
             elif (i == 2):
-                pubdate = gmtime(mktime(strptime(line[16:26].replace("-", "/")+" "+line.split("</a>")[-1][4:-11], "%Y/%m/%d %H:%M:%S")))
+                pubdate = gmtime(mktime(strptime(line[16:26]+" "+line.split("</a>")[-1][4:-11], "%Y-%m-%d %H:%M:%S")))
                 line = "            <pubDate>"+strftime("%a, %d %b %Y %H:%M:%S", pubdate)+" GMT</pubDate>\n"
                 line += "            <description>\n"
             # Write subsequent lines to the file. If we are truncating
@@ -199,6 +189,8 @@ def AppendToFeed(source):
     feed_fd.write("            </description>\n        </item>\n")
     feed_fd.close()
 
+    del html_filename, flag, feed_fd
+
 # Method: BuildFromTemplate
 # Purpose: Build a target file, with a specified title and body id, and
 # optional fields for inserted stylesheets and content
@@ -219,6 +211,8 @@ def BuildFromTemplate(target, title, bodyid, description="", sheets="", passed_c
     fd.write(content[0].replace("{{META_DESC}}", description).replace("{{ title }}", title).replace("{{ BODYID }}", bodyid, 1).replace("<!-- SHEETS -->", sheets, 1))
     fd.write(passed_content)
     fd.close()
+
+    del fd
 
 # Method: CheckDirAndCreate
 # Purpose: Check for the existence of a given directory, and create it if it
@@ -244,108 +238,159 @@ def CloseTemplateBuild(target, scripts=""):
     fd.write(content[1].replace("<!-- SCRIPTS BLOCK -->", scripts))
     fd.close()
 
+    del fd
+
+# Method: HandleYear
+# Purpose: Process all the posts in a year.
+# Parameters: none
+def HandleYear(year):
+    # Make global variables accessible in the method, and initialize method variables.
+    global files
+    global content
+
+    # For each year in which a post was made, generate a 'year' file, that
+    # contains links to each month in which a post was published.
+
+    # Clear the 'year' file
+    year_fd = open("./local/blog/"+year+".html", "w").close()
+    year_fd = open("./local/blog/"+year+".html", "a")
+    # Write the opening HTML tags
+    year_fd.write(content[0].replace("{{ title }}", "Post Archives - ").replace("{{ BODYID }}", "archives", 1).replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("explore.html", "../explore.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1))
+    # Insert a 'big table' into the document, to better display the months listed.
+    year_fd.write("""<table style="width:100%;padding:20pt 0;" id="big_table">""")
+    year_fd.write("    <tr>\n        <td>%s</td>\n    </tr>\n" % (year))
+    # Sort the sub-dictionaries by keys, months, then iterate over it. For each
+    # month in which a post was made, generate a 'month' file that contains all
+    # posts made during that month.
+    for month in sorted(files[year], reverse=True):
+        # Add a link to the month, to the year file it belongs to.
+        year_fd.write("    <tr>\n        <td><a href=\"%s\">%s</a></td>\n    </tr>\n" % (year+"-"+month+".html", months[month]))
+        # Clear the 'month' file
+        month_fd = open("./local/blog/"+year+"-"+month+".html", "w").close()
+        month_fd = open("./local/blog/"+year+"-"+month+".html", "a")
+        # Write the opening HTML tags
+        month_fd.write(content[0].replace("{{ title }}", "Post Archives - ").replace("{{ BODYID }}", "archives", 1).replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("explore.html", "../explore.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1).replace("<!--BLOCK HEADER-->", "<article>\n<p>\n"+months[month]+", <a href=\""+year+".html\">"+year+"</a>\n</p>\n</article>", 1))
+        
+        # Sort the sub-dictionaries by keys, days, then iterate over it.
+        for day in sorted(files[year][month], reverse=True):
+            # Sort the sub-dictionaries by keys, timestamps, then iterate over it
+            for timestamp in sorted(files[year][month][day], reverse=True):
+                # If a structure file already exists, don't rebuild the HTML file for individual articles
+                if (not isfile("./local/blog/"+files[year][month][day][timestamp].lower().replace(" ","-")[0:-3]+"html")):                        
+                    article_title = GenPage(files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
+                else:
+                    if (CompareMtimes("./Content/"+files[year][month][day][timestamp], "./local/blog/"+files[year][month][day][timestamp].lower().replace(" ","-")[0:-3]+"html")):
+                        article_title = GetTitle(files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
+                    else:
+                        # Generate each content file. "year", "month", "day", "timestamp"
+                        # identify the file in the dictionary, and the passed time values
+                        # designate the desired update time to set the content file.
+                        article_title = GenPage(files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
+                
+                # For each article made in the month, add an entry on the appropriate
+                # 'month' structure file.
+                month_fd.write("<article>\n    %s<a href=\"%s\">%s</a>\n</article>\n" % (year+"/"+month+"/"+day+" "+timestamp+": ", files[year][month][day][timestamp].lower().replace(" ", "-")[0:-3]+"html", article_title.strip()))
+        
+        # Write closing HTML tags to the month file.
+        month_fd.write(content[1].replace("assets/", "../assets/"))
+        month_fd.close()
+    
+    # Write closing HTML tags to the year file.
+    year_fd.write("</table>\n"+content[1].replace("assets/", "../assets/"))
+    year_fd.close()
+
+    del article_title, year_fd, month_fd
+
 # Method: GenBlog
-# Purpose: Generate the blog.
+# Purpose: Generate the blog, archives, and feed.
 # Parameters: none
 def GenBlog():
     # Make global variables accessible in the method, and initialize method variables.
     global files
-    global file_idx
-    global content
 
-    # Sort the files dictionary by keys, year, then iterate over it
+    # file_idx: Current file number. (Int)
+    # buff: [File names, timestamps] for all posts. (List)
+    file_idx = 0
+    file_buffer = []
+
     for year in sorted(files, reverse=True):
-        # For each year in which a post was made, generate a 'year' file, that
-        # contains links to each month in which a post was published.
-
-        # Clear the 'year' file
-        year_fd = open("./local/blog/"+year+".html", "w").close()
-        year_fd = open("./local/blog/"+year+".html", "a")
-        # Write the opening HTML tags
-        year_fd.write(content[0].replace("{{ title }}", "Post Archives - ").replace("{{ BODYID }}", "archives", 1).replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1))
-        # Insert a 'big table' into the document, to better display the months listed.
-        year_fd.write("""<table style="width:100%;padding:20pt 0;" id="big_table">""")
-        year_fd.write("    <tr>\n        <td>%s</td>\n    </tr>\n" % (year))
-        # Sort the sub-dictionaries by keys, months, then iterate over it. For each
-        # month in which a post was made, generate a 'month' file that contains all
-        # posts made during that month.
         for month in sorted(files[year], reverse=True):
-            # Add a link to the month, to the year file it belongs to.
-            year_fd.write("    <tr>\n        <td><a href=\"%s\">%s</a></td>\n    </tr>\n" % (year+"-"+month+".html", months[month]))
-            # Clear the 'month' file
-            month_fd = open("./local/blog/"+year+"-"+month+".html", "w").close()
-            month_fd = open("./local/blog/"+year+"-"+month+".html", "a")
-            # Write the opening HTML tags
-            month_fd.write(content[0].replace("{{ title }}", "Post Archives - ").replace("{{ BODYID }}", "archives", 1).replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1).replace("<!--BLOCK HEADER-->", "<article>\n<p>\n"+months[month]+", <a href=\""+year+".html\">"+year+"</a>\n</p>\n</article>", 1))
-            
-            # Sort the sub-dictionaries by keys, days, then iterate over it.
-            for day in sorted(files[year][month], reverse=True):
-                # Sort the sub-dictionaries by keys, timestamps, then iterate over it
-                for timestamp in sorted(files[year][month][day], reverse=True):
-                    # If a structure file already exists, don't rebuild the HTML file for individual articles
-                    if (not isfile("./local/blog/"+files[year][month][day][timestamp].lower().replace(" ","-")[0:-3]+"html")):                        
-                        article_title = GenPage(files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
-                    else:
-                        if (CompareMtimes("./Content/"+files[year][month][day][timestamp], "./local/blog/"+files[year][month][day][timestamp].lower().replace(" ","-")[0:-3]+"html")):
-                            article_title = GetTitle(files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
-                        else:
-                            # Generate each content file. "year", "month", "day", "timestamp"
-                            # identify the file in the dictionary, and the passed time values
-                            # designate the desired update time to set the content file.
-                            article_title = GenPage(files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
-                    
-                    # For each article made in the month, add an entry on the appropriate
-                    # 'month' structure file.
-                    month_fd.write("<article>\n    %s<a href=\"%s\">%s</a>\n</article>\n" % (year+"/"+month+"/"+day+" "+timestamp+": ", files[year][month][day][timestamp].lower().replace(" ", "-")[0:-3]+"html", article_title.strip()))
+                for day in sorted(files[year][month], reverse=True):
+                    for timestamp in sorted(files[year][month][day], reverse=True):
+                        file_buffer.append([files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp)])
 
-                    # Add the first twenty-five articles to the main blog page.
-                    if (file_idx < 25):
-                        AppendContentOfXToY("./local/blog", files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
-                    # Write the years in which a post was made to the header element, in a
-                    # big table to facilitate easy reading. 
-                    elif (file_idx == 25):
-                        # This block just puts three year entries in the first row, ends
-                        # the row, and then puts three more year entries in the second row.
-                        # This code is stored in 'buff', and then added to the archives
-                        # page.
-                        buff = """\n<article>\n<table style="width:100%;padding:2% 0;" id="big_table">\n    <tr>\n"""
-                        for each in sorted(files, reverse=True)[:3]:
-                            buff += """\n        <td>\n            <a href=\"blog/%s\">%s</a>\n        </td>""" % (each.lower()+".html", each)
-                        buff += """\n    </tr>\n    <tr>\n"""
-                        for each in sorted(files, reverse=True)[3:]:
-                            buff += """\n        <td>\n            <a href=\"blog/%s\">%s</a>\n        </td>""" % (each.lower()+".html", each)
-                        buff += """\n    </tr>\n</table>\n</article>\n"""
-                        archives_fd = open("./local/archives.html", "a")
-                        archives_fd.write(buff)
-                        archives_fd.write("<article style='text-align:center;padding:20pt;font-size:200%%;'><a href='/blog/%s.html'>%s</a></article>" % (year, year))
-                        archives_fd.close()
-                        temp = year
+    for fname, timestamp in file_buffer:
+        # Add the first twenty-five articles to the main blog page.
+        if (file_idx < 25):
+            AppendContentOfXToY("./local/blog", fname, timestamp)
+        # Write the years in which a post was made to the header element, in a
+        # big table to facilitate easy reading. 
+        elif (file_idx == 25):
+            # This block just puts three year entries in the first row, ends
+            # the row, and then puts three more year entries in the second row.
+            # This code is stored in 'buff', and then added to the archives
+            # page.
+            buff = """\n<article>\n<table style="width:100%;padding:2% 0;" id="big_table">\n    <tr>\n"""
+            for each in sorted(files, reverse=True)[:3]:
+                buff += """\n        <td>\n            <a href=\"blog/%s\">%s</a>\n        </td>""" % (each.lower()+".html", each)
+            buff += """\n    </tr>\n    <tr>\n"""
+            for each in sorted(files, reverse=True)[3:]:
+                buff += """\n        <td>\n            <a href=\"blog/%s\">%s</a>\n        </td>""" % (each.lower()+".html", each)
+            buff += """\n    </tr>\n</table>\n</article>\n"""
+            archives_fd = open("./local/archives.html", "a")
+            archives_fd.write(buff)
+            del buff
+            archives_fd.write("<article style='text-align:center;padding:20pt;font-size:200%%;'><a href='/blog/%s.html'>%s</a></article>" % (year, year))
+            archives_fd.close()
+            temp = year
 
-                        # Add the twenty-sixth article to the archives page.
-                        AppendContentOfXToY("./local/archives", files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
-                    
-                    # Add all other articles to the archives page.
-                    else:
-                        if (temp != year):
-                            archives_fd = open("./local/archives.html", "a")
-                            archives_fd.write("<article style='text-align:center;padding:20pt;font-size:200%%;'><a href='/blog/%s.html'>%s</a></article>" % (year, year))
-                            archives_fd.close()
-                            temp = year
-                        AppendContentOfXToY("./local/archives", files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
-                    
-                    # Add all articles to the RSS feed.
-                    AppendToFeed(files[year][month][day][timestamp])
-                    
-                    # Increase the file index.
-                    file_idx += 1
-            
-            # Write closing HTML tags to the month file.
-            month_fd.write(content[1].replace("assets/", "../assets/"))
-            month_fd.close()
-        
-        # Write closing HTML tags to the year file.
-        year_fd.write("</table>\n"+content[1].replace("assets/", "../assets/"))
-        year_fd.close()
+            # Add the twenty-sixth article to the archives page.
+            AppendContentOfXToY("./local/archives", fname, timestamp)
+
+        # Add all other articles to the archives page.
+        else:
+            if (temp != year):
+                archives_fd = open("./local/archives.html", "a")
+                archives_fd.write("<article style='text-align:center;padding:20pt;font-size:200%%;'><a href='/blog/%s.html'>%s</a></article>" % (year, year))
+                archives_fd.close()
+                temp = year
+            AppendContentOfXToY("./local/archives", fname, timestamp)
+
+        # Add all articles to the RSS feed.
+        AppendToFeed(fname)
+
+        # Increase the file index.
+        file_idx += 1
+
+    GenExplore(choices(file_buffer, k=3))
+
+    del file_idx, file_buffer
+
+# Method: GenExplore
+# Purpose: Generate the Explore page
+# Parameters: Random articles to include
+def GenExplore(files):
+    # Start the template build
+    BuildFromTemplate("./local/explore.html", "Explore", "explore", description="DESCRIPTION HERE", sheets="", passed_content="")
+    # Add intro paragraph
+    with open("./local/explore.html", "a") as fd:
+        fd.write("<article>\n<p>\nEvery time I update this site, new articles appear here. This helps unearth old, unpopular posts that&#160;&#8212;&#160;left alone&#160;&#8212;&#160;no one would ever read again.\n</p>\n</article>")
+    # Append contents of random files
+    for each in files:
+        AppendContentOfXToY("./local/explore", each[0], each[1])
+    # Close the template build
+    CloseTemplateBuild("./local/explore.html")
+
+# Method: GenSite
+# Purpose: Generate the blog.
+# Parameters: none
+def GenSite():
+    # Use multithreading to speed up processing each year's posts
+    with Pool() as pool:
+        pool.map(HandleYear, sorted(files, reverse=True))
+
+    # Build the blog and archives pages, and the feed
+    GenBlog()
 
     # Write closing HTML Tags to archives.html and blog.html, using Terminate()
     Terminate()
@@ -378,7 +423,7 @@ def GenPage(source, timestamp):
     target_fd = open(dst, "a")
 
     # Insert Javascript code for device detection.
-    local_content = content[0].replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1).replace("{{ BODYID }}", "post",1)
+    local_content = content[0].replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("explore.html", "../explore.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1).replace("{{ BODYID }}", "post",1)
     
     # Initialize idx to track line numbers, and title to hold the title block of each article.
     idx = 0
@@ -420,6 +465,7 @@ def GenPage(source, timestamp):
         # generated up to this point. Then write the first paragraph, parsed.
         elif (idx == 6):
             target_fd.write(local_content.replace("{{META_DESC}}", line.replace('"', "&#34;").strip()).strip())
+            del local_content
             target_fd.write("\n"+title.strip())
             target_fd.write("\n"+md.html(line).strip())
         # For successive lines of the file, parse them as Markdown and write them to the file.
@@ -438,8 +484,10 @@ def GenPage(source, timestamp):
     target_fd.close()
     source_fd.close()
 
-    mtime = strftime("%Y/%m/%d %H:%M:%S", localtime(stat("./Content/"+source).st_mtime))
-    utime(dst, ((mktime(strptime(mtime, "%Y/%m/%d %H:%M:%S"))), (mktime(strptime(mtime, "%Y/%m/%d %H:%M:%S")))))
+    mtime = stat("./Content/"+source).st_mtime
+    utime(dst, (mtime, mtime))
+
+    del src, dst, source_fd, idx, title, target_fd, mtime
 
     return article_title
 
@@ -453,21 +501,26 @@ def GenStatic():
     home = fd.read().split("<!-- DIVIDER -->")
     fd.close()
     BuildFromTemplate(target="./local/index.html", title="", bodyid="home", description="DESCRIPTION HERE", sheets=home[0], passed_content=home[1])
+    del home
 
     # Reference the projects.html source file to generate the front-end structure file.
     fd = open("system/projects.html", "r")
     projects = fd.read().split("<!-- DIVIDER -->")
     fd.close()
     BuildFromTemplate(target="./local/projects.html", title="Projects - ", bodyid="projects", description="DESCRIPTION HERE", sheets="", passed_content=projects[1])
+    del projects
 
     # Reference the disclaimers.html source file to generate the front-end structure fule.
     fd = open("system/disclaimers.html", "r")
     disclaimers = fd.read().split("<!-- DIVIDER -->")
     BuildFromTemplate(target="./local/disclaimers.html", title="Disclaimers - ", bodyid="disclaimers", description="DESCRIPTION HERE", sheets="", passed_content=disclaimers[1].replace("{{NAME}}", full_name))
     fd.close()
+    del disclaimers
 
     # Build the 404.html file.
     BuildFromTemplate(target="./local/404.html", title="Error - ", bodyid="error", description="DESCRIPTION HERE", sheets="", passed_content="")
+
+    del fd
 
 # Method: GetUserInput
 # Purpose: Accept user input and perform basic bounds checking
@@ -476,28 +529,66 @@ def GenStatic():
 def GetUserInput(prompt):
     global c
 
+    from tty import setraw, setcbreak # Raw input
+    import termios
+
+    def CommandLine(prompt):
+        backup = termios.tcgetattr(stdin)
+
+        setraw(stdin)
+        input = ""
+        index = 0
+        while True: # loop for each character
+            # Print current input-string with prompt
+            stdout.write(u"\u001b[1000D")
+            stdout.write(u"\u001b[0K")
+            stdout.write(prompt+" "+input)
+            stdout.write(u"\u001b[1000D")
+            stdout.write(u"\u001b[" + str(index+len(prompt)+1) + "C")    
+            stdout.flush()
+            char = ord(stdin.read(1)) # read one char and get char code
+            
+            # Manage internal data-model
+            if char == 3: # CTRL-C
+                termios.tcsetattr(stdin, termios.TCSAFLUSH, backup)
+                return
+            elif 32 <= char <= 126: # Normal letters
+                input = input[:index] + chr(char) +  input[index:]
+                index += 1
+            elif char in {10, 13}: # Enter key
+                index = 0
+                termios.tcsetattr(stdin, termios.TCSAFLUSH, backup)
+                break
+            elif char == 27: # Arrow keys
+                next1, next2 = ord(stdin.read(1)), ord(stdin.read(1))
+                if next1 == 91:
+                    if next2 == 68: # Left
+                        index = max(0, index - 1)
+                    elif next2 == 67: # Right
+                        index = min(len(input), index + 1)
+            elif char == 127: # Delete
+                input = input[:index-1] + input[index:]
+                index -= 1
+            stdout.flush()
+
+        stdout.write('\n')
+        stdout.write(u"\u001b[1000D")
+        return input
+
     # Prompt the user for valid input
     while True:
-        string = input(prompt)
-        
+        # string = input(prompt)
+        string = CommandLine(prompt)
+
         # Do not allow empty strings
         if (len(string) == 0):
             print(c.WARNING+"Input cannot be empty."+c.ENDC)
-            continue
         # Do not allow more than 64 characters
         elif (len(string) > 64):
             print(c.WARNING+"Input bound exceeded."+c.ENDC)
-            continue
         # If we get here, we have valid input
         break
     return string
-
-# Method: GetFiles
-# Purpose: Return the global variable files, to make it accessible in a method
-# Parameters: none
-def GetFiles():
-    global files
-    return files
 
 # Method: GetTitle
 # Purpose: Return the article title of a source file.
@@ -506,18 +597,20 @@ def GetFiles():
 def GetTitle(source, timestamp):
     src = "Content/"+source
 
-    with open(src, "r") as source_fd:
-        # Ensure source file contains header. If not, use the Migrate() method to generate it.
-        source_fd = open(src, "r")
-        line = source_fd.readline()
-        if (line[0:5] != "Type:"):
-            Migrate(source, timestamp)
+    # Ensure source file contains header. If not, use the Migrate() method to generate it.
+    source_fd = open(src, "r")
+    line = source_fd.readline()
+    if (line[0:5] != "Type:"):
         source_fd.close()
-        
-        # Open the source file in read mode.
-        source_fd = open(src, "r")
-        source_fd.readline()
-        title = source_fd.readline()[7:]
+        Migrate(source, timestamp)
+    
+    # Open the source file in read mode.
+    source_fd = open(src, "r")
+    source_fd.readline()
+    title = source_fd.readline()[7:]
+    source_fd.close()
+
+    del src, source_fd, line
 
     return title
 
@@ -542,13 +635,13 @@ def Init():
             res = GetUserInput("(y/n) # ")
 
         if (res == "y"):
-            print(c.UNDERLINE+"Base URL"+c.ENDC+": The base domain name for your website, i.e. https://zacs.site")
+            print(c.UNDERLINE+"Base URL"+c.ENDC+": The base domain for your website, i.e. https://zacs.site")
             print(c.UNDERLINE+"Byline"+c.ENDC+": The name of the author, as you want it to display on all blog posts.")
-            print(c.UNDERLINE+"Full name"+c.ENDC+": The full, legal name of the content owner, used to generate the copyright notice.")
-            print(c.UNDERLINE+"Keywords"+c.ENDC+": Any keywords you would like a search engine to use to send visitors to your website.\n          At the least, I suggest alternate spellings of your name and nicknames.")
-            print(c.UNDERLINE+"App name"+c.ENDC+": The app name a user will see if they save your website to their home screen. I recommend using your name.")
-            print(c.UNDERLINE+"Twitter URL"+c.ENDC+": The URL to your Twtitter profile, to give your readers somewhere to interact with you.")
-            print(c.UNDERLINE+"Instagram URL"+c.ENDC+": The URL to your Instagram profile, to give your readers somewhere else to interact with you. ")
+            print(c.UNDERLINE+"Full name"+c.ENDC+": The full, legal name of the content owner, for the copyright notice.")
+            print(c.UNDERLINE+"Keywords"+c.ENDC+": Key words that describe your website.")
+            print(c.UNDERLINE+"App name"+c.ENDC+": The name users will see if they put your site on their home screen.")
+            print(c.UNDERLINE+"Twitter URL"+c.ENDC+": The URL to your Twtitter profile.")
+            print(c.UNDERLINE+"Instagram URL"+c.ENDC+": The URL to your Instagram profile.")
             print()
 
             base_url = GetUserInput("Base URL: ").rstrip("/")
@@ -564,6 +657,8 @@ def Init():
             print(c.FAIL+"Configuration file not created."+c.ENDC)
             print(c.WARNING+"Please run again."+c.ENDC)
             exit(0)
+
+        del res
 
         # Remove the migration script.
         if (isfile("./.sys.sh")):
@@ -594,7 +689,7 @@ def Init():
     # If any of these values were blank, notify the user and throw an error.
     if (base_url == "" or byline == "" or full_name == ""):
         print(c.FAIL+"Error reading settings from './.config'. Please check file configuration and try again."+c.ENDC)
-        exit(1)
+        exit(0)
     elif (meta_keywords == "" or meta_appname == "" or twitter_url == "" or insta_url == ""):
         print(c.WARNING+"You have not finished initializing the configuration file. Please finish setting up './.config'.")
 
@@ -612,7 +707,7 @@ def Init():
     ## Now ensure crucial system files exist
     for f in ["template.htm", "index.html", "projects.html", "disclaimers.html"]:
         if (not isfile("./system/"+f)):
-            print(c.FAIL+"\"./system/"+f+"\" directory does not exist. Exiting."+c.ENDC)
+            print(c.FAIL+"\"./system/"+f+"\" does not exist. Exiting."+c.ENDC)
             exit(1)
 
     # Make sure ./local exists with its subfolders
@@ -621,8 +716,7 @@ def Init():
     CheckDirAndCreate("./local/assets")
 
     # Make global variables accessible in the method, and initialize method variables.
-    global md, file_idx, files, content
-    file_idx = 0
+    global md, files, content
     files = {}
 
     # Initialize Markdown Parser
@@ -664,6 +758,8 @@ def Init():
                 files[mtime[0]][mtime[1]][mtime[2]][mtime[3]] = {}
             files[mtime[0]][mtime[1]][mtime[2]][mtime[3]] = each
 
+    del fd
+
 # Method: Interface
 # Purpose: Provide a command line interface for the script, for more granular control
 # of its operation.
@@ -688,7 +784,7 @@ def Interface(params,search_query="",end_action="continue"):
         # If the user entered this mode with the "-a" parameter, prompt them for
         # new input. Otherwise, proceed with their request.
         if "-a" in params:
-            query = input("#: ")
+            query = GetUserInput("#: ")
         else:
             query = str(params)
         params = ""
@@ -779,6 +875,8 @@ def Migrate(target, mod_time):
     fd.write("""Type: %s\nTitle: %s\nLink: %s\nPubdate: %s\nAuthor: %s\n\n%s""" % (article_type, article_title.strip(), article_url.strip(), mod_time, byline, article_content.strip()))
     fd.close()
 
+    del fd, article_content, article_title, article_url
+
     # Revert the update time for the target file, to its previous value.
     utime("Content/"+target, ((mktime(strptime(mod_time, "%Y/%m/%d %H:%M:%S"))), (mktime(strptime(mod_time, "%Y/%m/%d %H:%M:%S")))))
 
@@ -790,20 +888,19 @@ def Migrate(target, mod_time):
 # Parameters: 
 # - tgt: Target file name (String)
 def Revert(tgt):
-    
     fd = open(tgt, "r")
     fd.readline()
     fd.readline()
     fd.readline()
-    mod_time = fd.readline()[9:].strip()
+    mod_time = mktime(strptime(fd.readline()[9:].strip(), "%Y/%m/%d %H:%M:%S"))
     fd.close()
-
-    mtime = strftime("%Y/%m/%d %H:%M:%S", localtime(stat(tgt).st_mtime))
     
-    if (mod_time != mtime):
+    if (mod_time != stat(tgt).st_mtime):
         print("Does not match for",tgt)
         print("Reverting to",mod_time)
-        utime(tgt, ((mktime(strptime(mod_time, "%Y/%m/%d %H:%M:%S"))), (mktime(strptime(mod_time, "%Y/%m/%d %H:%M:%S")))))
+        utime(tgt, (mod_time, mod_time))
+
+    del fd, mod_time
 
 # Method: SearchFile
 # Purpose: Search for a string within a file.
@@ -839,6 +936,8 @@ def Terminate():
     fd.write("""\n</channel>\n</rss>""")
     fd.close()
 
+    del fd
+
 # If run as an individual file, generate the site and report runtime.
 # If imported, only make methods available to imported program.
 if __name__ == '__main__':
@@ -869,12 +968,12 @@ if __name__ == '__main__':
     t1 = datetime.datetime.now()
     Init()
     GenStatic()
-    GenBlog()
+    GenSite()
     
     # import cProfile
     # cProfile.run("Init()")
     # cProfile.run("GenStatic()")
-    # cProfile.run("GenBlog()")
+    # cProfile.run("GenSite()")
 
     t2 = datetime.datetime.now()
 

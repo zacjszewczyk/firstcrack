@@ -69,13 +69,13 @@ help:
 .config:
 	@make help
 	@echo
-	@echo "This menu will appear until you finish setting up your website. After that, you can access it at again at any time with the command 'make help'." 
+	@echo "This menu will appear until you finish setup. Use 'make help' to see it again."
 	@echo
 	@echo "Checking system requirements."
 	@./.sys.sh
 	@echo "Done checking system requirements."
 	@echo
-	@echo "First Crack will now prompt you to create the config file. Proceed by entering 'y' at the prompt."
+	@echo "First Crack will now prompt you to create the config file. Enter 'y'."
 	@echo
 	@chmod 755 blog.py
 	@touch -m -t 200012312359.59 "./Content/Test Linkpost.txt" 2> /dev/null

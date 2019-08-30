@@ -57,6 +57,7 @@ h6 {
     max-width: 40%; }
 #home #home_link, 
 #blog #blog_link, 
+#explore #explore_link, 
 #projects #projects_link,
 #postarchives #archives_link,
 #archives #archives_link,
@@ -94,7 +95,7 @@ main article>time {
     font-size: 90%;
     display: block; }
 nav a {
-    margin: 0px 5%;
+    margin: 0px 2%;
     white-space: nowrap; }
 p a {
     text-decoration: underline; }

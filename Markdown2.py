@@ -3,7 +3,7 @@
 # Footnotes
 
 # Import methods
-from re import findall # re.findall, for links
+from re import findall, sub # for links and ampersands
 from os.path import isfile
 
 class Markdown:
@@ -102,16 +102,6 @@ class Markdown:
 
         return __line
 
-    # Method: __trimTracker
-    # Purpose: Keep tracker lists to a max of three elements.
-    # Parameters:
-    # - self: Class namespace
-    # - __trkr: Reference to tracker to be trimmed.
-    # Return: None.
-    def __trimTracker(self, __trkr):
-        if (len(__trkr) > 3):
-            __trkr.pop(0)
-
     # Method: __updateLineTracker
     # Purpose: Keep track of raw lines.
     # Parameters:
@@ -120,7 +110,8 @@ class Markdown:
     # Return: None.
     def __updateLineTracker(self, __line):
         self.__line_tracker.append(__line)
-        self.__trimTracker(self.__line_tracker)
+        if (len(self.__line_tracker) > 3):
+            self.__line_tracker.pop(0)
 
     # Method: __updateLineTypeTracker
     # Purpose: Determine type of line, and whether it is part of a larger
@@ -183,6 +174,13 @@ class Markdown:
             # Otherwise, treat the line as the first in a new list.
             else:
                 self.__line_type_tracker.append("ol")
+        elif (__line[0] == "+" and __line[1] == "-"): # Table
+            if (self.__line_type_tracker[-1] != "tr"):
+                self.__line_type_tracker.append("table")
+            else:
+                self.__line_type_tracker.append("tr")
+        elif  (__line[0] == "|"): # Table rows
+            self.__line_type_tracker.append("tr")
         elif (__line[0] == ">"): # Blockquote
             # If the line is preceeded by a blockquote tag or the parser
             # is already in a blockquote, continue parsing the existing
@@ -202,7 +200,8 @@ class Markdown:
             self.__line_type_tracker.append("p")
 
         # Trim the tracker to a max of 3 elements.
-        self.__trimTracker(self.__line_type_tracker)
+        if (len(self.__line_type_tracker) > 3):
+            self.__line_type_tracker.pop(0)
 
     # Method: __updateIndentTracker
     # Purpose: Keep track of the indentation level.
@@ -216,7 +215,8 @@ class Markdown:
         # Count leading spaces, and append to the line tracker list
         else:
             self.__line_indent_tracker.append(len(__line) - len(__line.lstrip(' ')))
-        self.__trimTracker(self.__line_indent_tracker)
+        if (len(self.__line_indent_tracker) > 3):
+            self.__line_indent_tracker.pop(0)
 
     # Method: __closeOut
     # Purpose: Write closing HTML tags for any open block-level elements.
@@ -237,13 +237,9 @@ class Markdown:
     # - Line with &, *, <, and > escaped using their HTML entities. (String)
     def __escapeCharacters(self, __line):
         # Escape ampersands. Replace them with the appropriate HTML entity.
-        __line = __line.replace("&", "&#38;")
-
-        for each in findall("`[^`\n]+`", __line):
-            __line = __line.replace(each, each.replace("*", "&#42;"))
-
-        # Escape backtick quotes
-        __line = __line.replace("\`", "&#8245;")
+        __line = sub(r"(&)(\w*[\s\.\,])", r"&#38;\2", __line)
+        # for each in findall("(&\w*\s)", __line):
+        #     __line = __line.replace(each, each.replace("&", "&#38;"))
 
         # Escape escaped asteriscs, to keep them from being read as bold or
         # italic text.
@@ -284,11 +280,10 @@ class Markdown:
         if (self.__line_type_tracker[-1] == "pre"):
             if (self.__pre == True):
                 return "<pre>"
-                # return "<pre>\n"+__line
             return "</pre>"
         
         if (self.__pre == True):
-            return self.__escapeCharacters(__line)
+            return __line
 
         if (self.__line_type_tracker[-1] == "raw"):
             return __line
@@ -331,6 +326,16 @@ class Markdown:
         # Handle list elements for both unordered and ordered lists.
         elif (self.__line_type_tracker[-1] == "li"):
             __line = "    <li>"+__line[2:]+"</li>"
+        # Handle tables
+        elif (self.__line_type_tracker[-1] == "table"):
+            __line = "<table>\n"
+            self.__close_out.append("</table>\n")
+        # Handle table rows
+        elif (self.__line_type_tracker[-1] == "tr"):
+            if (__line[0] == "+"):
+                __line = ""
+            else:
+                __line = "<tr>\n    <td>"+__line.lstrip("|").rstrip("|").replace("|", "</td><td>")+"</td>\n</tr>"
         # Handle blockquotes, new and a continuation of an existing one.
         elif (self.__line_type_tracker[-1] == "blockquote"):
             __line = "<blockquote>\n    <p>"+self.__parseInlineMD(__line[5:])+"</p>"
