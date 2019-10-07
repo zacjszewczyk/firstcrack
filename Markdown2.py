@@ -14,15 +14,14 @@ class Markdown:
     # - __base_url: Base URL for relative links. (String)
     # Return: none
     def __init__(self, base_url=""):
-        self.__base_url = base_url
-
-    # Initialize variables
-    __base_url = "" # Base URL, given for relative links
-    __line_tracker = ["", "", ""] # Last three lines, raw.
-    __line_type_tracker = ["", "", ""] # Type of last three lines.
-    __line_indent_tracker = [0, 0, 0] # Indent level of last three lines.
-    __close_out = [] # List of block-level elements that still need closed out.
-    __pre = False # Yes/no, is the parser in a <pre> tag?
+        # Initialize variables
+        self.__base_url = base_url # Base URL, given for relative links
+        self.__line_tracker = ["", "", ""] # Last three lines, raw.
+        self.__line_type_tracker = ["", "", ""] # Type of last three lines.
+        self.__line_indent_tracker = [0, 0, 0] # Indent level of last three lines.
+        self.__close_out = [] # List of block-level elements that still need closed out.
+        self.__pre = False # Yes/no, is the parser in a <pre> tag?
+        self.__html = False # Yes/no, is this an HTML file?
 
     # Method: __parseInlineMD
     # Purpose: Turn all inline Markdown tags into HTML.
@@ -35,14 +34,14 @@ class Markdown:
         # Add a <br /> if three or more trailing spaces.
         if ((len(__line) - len(__line.rstrip(' '))) > 2):
             __line = __line.strip() + "<br />"
-        
+
         # Parser tracks leading whitespace, so remove it.
         __line = __line.strip()
 
         # If the remaining line length is 0, return blank line.
         if (len(__line) == 0):
             return ""
-        
+
         # Parse  emdashes
         __line = __line.replace("--", "&#160;&#8212;&#160;")
 
@@ -66,7 +65,7 @@ class Markdown:
         ## Parse aposrophes.
         for each in findall("\w'\w", __line):
             __line = __line.replace(each, each.replace("'", "&#8217;"))
-        
+
         ## Parse single quotatin marks.
         for each in findall("\'[^\']+\'", __line):
             __line = __line.replace(each, each.replace("'", "&#8216;", 1).replace("'", "&#8217;", 1))
@@ -124,8 +123,14 @@ class Markdown:
         # Parser tracks leading whitespace, so remove it.
         __line = __line.lstrip(' ')
 
+        if (__line == "<html>"):
+            if (self.__line_type_tracker[-2] == "" and self.__line_type_tracker[-3] == ""):
+                self.__html = True
+
         if (len(__line.strip()) == 0): # Blank line.
             self.__line_type_tracker.append("blank")
+        elif (__line == "{EOF}"): # End of file
+            self.__line_type_tracker.append("EOF")
         elif (__line[0] == "<" and (__line[0:4] != "<pre" and __line[0:5] != "</pre")): # Raw HTML
             self.__line_type_tracker.append("raw")
         elif (__line[0] == "#"): # Header.
@@ -190,7 +195,7 @@ class Markdown:
             # Otherwise, treat this line as the opening of a new blockquote
             else:
                 self.__line_type_tracker.append("blockquote")
-        elif (__line[0:4] == "```" or __line[0:4] == "<pre" or __line[0:5] == "</pre"): # Preformatted code block
+        elif (__line[0:3] == "```" or __line[0:4] == "<pre" or __line[0:5] == "</pre"): # Preformatted code block
             self.__line_type_tracker.append("pre")
             # Toggle the boolean for tracking if the parser is in a code block
             self.__pre = not self.__pre
@@ -261,6 +266,11 @@ class Markdown:
     # Return:
     # - Line formatted with HTML. (String)
     def html(self, __line):
+        if (self.__html == True):
+            if ("{EOF}" in __line):
+                return ""
+            return __line
+
         # Remove trailing newline
         __line = __line.rstrip('\n')
 
@@ -279,9 +289,15 @@ class Markdown:
         # then return the unprocessed line.
         if (self.__line_type_tracker[-1] == "pre"):
             if (self.__pre == True):
+                if ("shell" in __line):
+                    return "<pre class='shell'>"
+                elif ("python" in __line):
+                    return "<pre class='python'>"
+                elif ("cmd" in __line):
+                    return "<pre class='cmd'>"
                 return "<pre>"
             return "</pre>"
-        
+
         if (self.__pre == True):
             return __line
 
@@ -296,7 +312,7 @@ class Markdown:
 
         # If the parser finds a blank line, close open block-level elements,
         # reset the block-level element tracker, and return the blank line.
-        if (len(__line) == 0):
+        if (len(__line) == 0 or self.__line_type_tracker[-1] == "EOF"):
             __line = self.__closeOut()
             self.__close_out = []
             return __line
@@ -402,7 +418,7 @@ class Markdown:
         # tags.
         if (self.__line_type_tracker[-1] not in ["blockquote", "bqt", "fn"]):
             __line = self.__parseInlineMD(__line)
-        
+
         return __line
 
     # Method: clear

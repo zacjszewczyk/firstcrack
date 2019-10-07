@@ -1,20 +1,225 @@
 #!/usr/local/bin/python3
 
+## BEGIN CLI BLOCK
+# Purpose: The purpose of this block is to provide an easy to use, as modular
+# as possible command line interface. Simply paste in this block, then edit.
+
+### Import modules
+from sys import exit, argv, stdout, stdin # Command line interface
+from tty import setraw, setcbreak # Raw input
+from termios import tcgetattr, tcsetattr, TCSAFLUSH # Backup/resume shell
+from os.path import exists # Reading input files
+
+# Class: c(olors)
+# Purpose: provide easy access to ANSI escape codes for styling output
+class c():
+    HEADER = '\033[95m' # Pink
+    OKBLUE = '\033[94m' # Purple
+    OKGREEN = '\033[92m' # Green
+    WARNING = '\033[93m' # Yellow
+    FAIL = '\033[91m' # Red
+    ENDC = '\033[0m' # None
+    BOLD = '\033[1m' # Blue
+    UNDERLINE = '\033[4m' # Underline
+
+# Method: ActivateInterface
+# Purpose: Activate the command line interface.
+# Parameters: none.
+def ActivateInterface():
+    # If the user just runs the file, notify them that they can use "-a"
+    # to enter "Authoring Mode". Then build the site.
+    if (len(argv) == 1):
+        print(c.UNDERLINE+"Note"+c.ENDC+": You can use '-a' to enter 'Authoring Mode'")
+    # If they have run the program with a single parameter, bounds check
+    # it, then send them to the interface
+    elif (len(argv) < 4):
+        # Don't allow double or single quatation marks, or input over 2
+        # characters long
+        if ('"' in argv[1] or "'" in argv[1] or len(argv[1]) > 2):
+            print(c.FAIL+"Invalid parameters"+c.ENDC)
+            exit(0)
+
+        # Send the user to the CLI
+        DisplayInterface(argv[1:])
+
+    else: # Too many parameters
+        print(c.FAIL+"Too many parameters"+c.ENDC)
+        exit(0)
+
+# Method: DisplayInterface
+# Purpose: Provide a command line interface for the script, for more granular control
+# of its operation.
+# Parameters: params: command line parameters (String)
+def DisplayInterface(params,search_query="",end_action="continue"):
+    # If the exit flag is set, check for other flags, then exit.
+    if ("--exit" in params):
+        end_action = "quit"
+
+    # Store the menu in a variable so as to provide easy access at any point in time.
+    menu = """
+    * To search all articles:                        %s-S%s
+    * To revert post timestamps:                     %s-r%s
+    * To clear all structure files:                  %s-R%s
+    * To display this menu:                          %s-h%s
+    * To exit this mode and build the site:          %sexit%s
+    * To exit this mode and quit the program:        %s!exit%s
+    """ % (c.OKGREEN, c.ENDC, c.OKGREEN, c.ENDC, c.OKGREEN, c.ENDC, c.WARNING, c.ENDC, c.FAIL, c.ENDC, c.FAIL, c.ENDC)
+
+    # Continue prompting the user for input until they enter a valid argument
+    while (True):
+        if ("-a" in params): # Get new input
+            print(menu)
+            params = GetUserInput("#: ")
+        if ("-h" in params or "help" in params): # Print help menu
+            print('Entering "-h" at any time will display the menu below.\n%s' % (menu))
+        elif ("-S" in params): # Search all articles
+            # If one has not been provided, get a string to search all files for
+            if (search_query == ""):
+                if (len(params) == 2):
+                    search_query = params[1]
+                else:
+                    search_query = GetUserInput("Enter search string: ")
+            # Iterate over the entire ./Content dirctory
+            for file in listdir("Content"):
+                # Only inspect text files
+                if (not ".txt" in file):
+                    continue
+                # Search each line of the file, case insensitively
+                res = SearchFile(file, search_query)
+                if (res):
+                    print("\nFile: "+c.UNDERLINE+file+c.ENDC)
+                    for match in res:
+                        print("    %sLine %d:%s %s" % (c.BOLD, match[0], c.ENDC, match[1]))
+            # Cleanup
+            del res
+        elif ("-r" in params): # Revert post timestamps
+            print("Reverting post timestamps.")
+            for files in listdir("Content"):
+                if (files.endswith(".txt")):
+                    Revert("Content/"+files)
+        elif ("-R" in params): # Rebuild all structure files
+            print("Rebuilding all structure files.")
+            for files in listdir("./local/blog"):
+                if (files.endswith(".html")):
+                    remove("./local/blog/"+files)
+            return False
+        elif ("!exit" in params): # Exit without building site
+            exit(0)
+        else: # Exit then build site
+            return False
+
+        if (end_action == "continue"):
+            params = GetUserInput("#: ")
+        else:
+            # Cleanup
+            del menu
+            break
+
+# Method: GetUserInput
+# Purpose: Accept user input and perform basic bounds checking
+# Parameters:
+# - prompt: Text to prompt the user for input (String)
+def GetUserInput(prompt):
+    # Prompt the user for valid input until they enter it.
+    while True:
+        # Capture user input
+        string = GetLine(prompt)
+
+        # Bounds check
+        ## Do not allow empty strings
+        if (len(string) == 0):
+            print(c.WARNING+"Input cannot be empty."+c.ENDC)
+            continue
+        ## Do not allow more than 256 characters
+        elif (len(string) > 256):
+            print(c.WARNING+"Input bound exceeded."+c.ENDC)
+            continue
+
+        # If we get here, we have valid input
+        break
+
+    # Send the user's input back to the requesting method.
+    return string
+
+# Method: GetLine
+# Purpose: Read a line from the user, allowing for cursor movement.
+# Parameters:
+# - prompt: Text to prompt the user for input (String)
+def GetLine(prompt):
+    # Backup the shell session, to restore it later.
+    backup = tcgetattr(stdin)
+
+    # Set the stage for the session.
+    setraw(stdin)
+    input = ""
+    index = 0
+
+    # Continue accepting input until the user aborts the process (CTRL-C)
+    # or hits the enter key.
+    while True:
+        # Clear screen, then print current input string with prompt
+        stdout.write(u"\u001b[1000D")
+        stdout.write(u"\u001b[0K")
+        stdout.write(prompt+" "+input)
+        stdout.write(u"\u001b[1000D")
+        stdout.write(u"\u001b[" + str(index+len(prompt)+1) + "C")
+        stdout.flush()
+
+        # Read a single character and get its code.
+        char = ord(stdin.read(1))
+
+        # Manage internal data-model
+        if char == 3: # CTRL-C
+            # Restore shell session from backup, then exit.
+            tcsetattr(stdin, TCSAFLUSH, backup)
+            return
+        elif 32 <= char <= 126: # Normal letters
+            # Insert new characters at the appropriate index.
+            input = input[:index] + chr(char) +  input[index:]
+            index += 1
+        elif char in {10, 13}: # Enter key
+            # Restore shell session from backup, then exit the loop.
+            # index = 0 # Should be able to get rid of this.
+            tcsetattr(stdin, TCSAFLUSH, backup)
+            break
+        elif char == 27: # Arrow keys
+            # Accept input from arrow keys and move the cursor accordingly
+            next1, next2 = ord(stdin.read(1)), ord(stdin.read(1))
+            if next1 == 91:
+                if next2 == 68: # Left
+                    index = max(0, index - 1)
+                elif next2 == 67: # Right
+                    index = min(len(input), index + 1)
+        elif char == 127: # Delete
+            # Remove characters at the appropriate index.
+            input = input[:index-1] + input[index:]
+            index = max(index-1,0)
+        # stdout.flush() # Should be able to get rid of this.
+
+    # On exit, print a newline and reset the cursor left.
+    stdout.write('\n')
+    stdout.write(u"\u001b[1000D")
+
+    # Cleanup
+    del index, char
+
+    # Return the string the user's input.
+    return input
+## END CLI BLOCK
+
 # Imports
 from os import listdir, stat, remove, utime, mkdir # File/folder operations
 from os.path import isdir, isfile # File/folder existence operations
-from time import strptime, strftime, mktime, localtime, gmtime # Managing file mod time
-import datetime # Recording runtime
-from re import search # Regex
-from sys import exit, argv, stdout, stdin # Command line options
+from time import strptime, strftime, mktime, localtime, gmtime # mod time ops
+from datetime import datetime # Recording runtime
 from Markdown2 import Markdown # Markdown parser
 from ModTimes import CompareMtimes # Compare file mod times
-from colors import c # Output styling
 from multiprocessing import Pool # Multiprocessing
 from random import choices # Building Explore page
+from locale import getpreferredencoding # Speed up file opens
 
 # Global variables
-## - files: Dictionary with years as the keys, and sub-dictinaries as the 
+## - files: Dictionary with years as the keys, and sub-dictinaries as the
 ##          elements. These elements have months as the keys, and a list
 ##          of the posts made in that month as the elements. (Dictionary)
 ## - content: A string with the opening and closing HTML tags. (String)
@@ -24,6 +229,7 @@ files = {}
 content = ""
 months = {"01":"January","02":"February","03":"March","04":"April","05":"May","06":"June","07":"July","08":"August","09":"September","10":"October","11":"November","12":"December"}
 md = ""
+ENCODING = getpreferredencoding()
 
 # Config variables, read in from './.config'
 ## - base_url: The base domain name for your website, i.e. https://zacs.site"). (String)
@@ -33,7 +239,8 @@ md = ""
 ## - meta_appname: The app name a user will see if they save your website to their home screen. (String)
 ## - twitter_url: The URL to your Twtitter profile. (String)
 ## - instagram_url: The URL to your Instagram profile. (String)
-base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url = "", "", "", "", "", "", ""
+class conf():
+    base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url = "", "", "", "", "", "", ""
 
 # Method: AppendContentOfXToY
 # Purpose: Append the first paragraph of an original article, or
@@ -44,11 +251,6 @@ base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url
 def AppendContentOfXToY(target, source, timestamp):
     # Store the name of the corresponding HTML file in a variable
     html_filename = source.lower().replace(" ", "-")[0:-3]+"html"
-    
-    # Check to see if a structure file has already been built. If not,
-    # build it.
-    if (not isfile("./local/blog/"+html_filename)):
-        GenPage(source, timestamp)
 
     # Instantiate a boolean flag variable, "flag". This indicates
     # whether to include the entire article (True) or truncate it
@@ -57,51 +259,54 @@ def AppendContentOfXToY(target, source, timestamp):
 
     # Now that we know there is a structure file built, pull the data
     # from there.
-    
+
     ## Open the source and the target files
-    target_fd = open(target+".html", "a")
-    with open("./local/blog/"+html_filename, "r") as source_fd:
-        
-        # Skip to the <article tag, then write the opening <article>
-        # tag to the output file.
-        for line in source_fd:
-            if ("<article" in line): target_fd.write("<article>"); break
+    target_fd = open(target+".html", "a", encoding=ENCODING)
+    source_fd = open("./local/blog/"+html_filename, "r", encoding=ENCODING)
 
-        # Iterate over each line of the source structure file.
-        for i, line in enumerate(source_fd):
-            # Check the first two lines of the structure file for a
-            # class tag denoting the type of article. If viewing an
-            # original article, truncate it at the first paragraph by
-            # setting the flag, "flag", to False
-            if (i <= 1):
-                if ('class="original"' in line):
-                    flag = False
-                    line = line.replace("href=\"", "href=\"blog/")
-            elif (i == 3):
+    # Skip to the <article tag, then write the opening <article>
+    # tag to the output file.
+    for i, line in enumerate(source_fd):
+        if ("<article" in line): target_fd.write("<article>"); break
+
+    # Iterate over each line of the source structure file.
+    for i, line in enumerate(source_fd):
+        # Check the first two lines of the structure file for a
+        # class tag denoting the type of article. If viewing an
+        # original article, truncate it at the first paragraph by
+        # setting the flag, "flag", to False
+        if (i <= 1):
+            if ('class="original"' in line):
+                flag = False
                 line = line.replace("href=\"", "href=\"blog/")
-            # Write subsequent lines to the file. If we are truncating
-            # the file and we encouter the first paragraph, write it to
-            # the output file and then quit.
-            elif (flag == False and line[0:2] == "<p"):
-                target_fd.write(line)
-                break
-
-            # Stop copying content at the end of the article.
-            if ("</article>" in line):
-                break
-    
-            # Write all lines from the structure file to the output file
-            # by default.
+        elif (i == 3):
+            line = line.replace("href=\"", "href=\"blog/")
+        # Write subsequent lines to the file. If we are truncating
+        # the file and we encouter the first paragraph, write it to
+        # the output file and then quit.
+        elif (flag == False and line[0:2] == "<p"):
             target_fd.write(line)
+            break
+
+        # Stop copying content at the end of the article.
+        if ("</article>" in line):
+            break
+
+        # Write all lines from the structure file to the output file
+        # by default.
+        target_fd.write(line)
+
+    source_fd.close()
 
     # Once we have reached the end of the content in the case of a linkpost,
-    # or read the first paragraph in the case of an original article, add a 
+    # or read the first paragraph in the case of an original article, add a
     # "read more" link and close the article.
     target_fd.write("\n    <p class='read_more_paragraph'>\n        <a style='text-decoration:none;' href='blog/%s'>&#x24E9;</a>\n    </p>" % (html_filename))
     target_fd.write("</article>")
     target_fd.close()
 
-    del html_filename, flag, target_fd
+    # Cleanup
+    del html_filename, flag, target_fd, source_fd
 
 # Method: AppendToFeed
 # Purpose: Append the content of a source file to the RSS feed.
@@ -110,11 +315,6 @@ def AppendContentOfXToY(target, source, timestamp):
 def AppendToFeed(source):
     # Store the name of the corresponding HTML file in a variable
     html_filename = source.lower().replace(" ", "-")[0:-3]+"html"
-    
-    # Check to see if a structure file has already been built. If not,
-    # build it.
-    if (not isfile("./local/blog/"+html_filename)):
-        GenPage(source, timestamp)
 
     # Instantiate a boolean flag variable, "flag". This indicates
     # whether to include the entire article (True) or truncate it
@@ -123,73 +323,74 @@ def AppendToFeed(source):
 
     # Now that we know there is a structure file built, pull the data
     # from there.
-    
+
     ## Open the feed and source file
-    feed_fd = open("./local/rss.xml", "a")
+    feed_fd = open("./local/rss.xml", "a", encoding=ENCODING)
 
     ## Write the opening <item> tag
     feed_fd.write("        <item>\n")
 
-    with open("./local/blog/"+html_filename, "r") as source_fd:
-        # Skip to the <article tag, then write the opening <article>
-        # tag to the output file.
-        for line in source_fd:
-            if ("<h2" in line): break
+    source_fd = open("./local/blog/"+html_filename, "r", encoding=ENCODING)
+    # Skip to the <article tag, then write the opening <article>
+    # tag to the output file.
+    for i, line in enumerate(source_fd):
+        if ("<h2" in line): break
 
-        # Iterate over each line of the source structure file.
-        for i, line in enumerate(source_fd):
-            # Strip whitespace
-            line = line.strip()
-            line = line.replace("&", "&#38;")
+    # Iterate over each line of the source structure file.
+    for i, line in enumerate(source_fd):
+        # Strip whitespace
+        line = line.strip()
+        line = line.replace("&", "&#38;")
 
-            # Check the first two lines of the structure file for a
-            # class tag denoting the type of article. If viewing an
-            # original article, truncate it at the first paragraph by
-            # setting the flag, "flag", to False
-            # print(i,":",line)
-            if (i == 0):
-                if ("class=\"original\"" in line):
-                    flag = False
-                    link = base_url+"/blog/"+line.split("href=\"")[1].split(" ")[0][:-1]
-                else:
-                    link = line.split("href=\"")[1].split(" ")[0][:-1]
-                if (link[0:4] != "http"):
-                    link = "http://"+link
-                line = "            <title>"+line.split("\">")[1][:-4]+"</title>\n"
-                line += "            <link>"+link+"</link>\n"
-                line += "            <guid isPermaLink='true'>"+link+"</guid>\n"
-            elif (i == 1):
-                continue
-            elif (i == 2):
-                pubdate = gmtime(mktime(strptime(line[16:26]+" "+line.split("</a>")[-1][4:-11], "%Y-%m-%d %H:%M:%S")))
-                line = "            <pubDate>"+strftime("%a, %d %b %Y %H:%M:%S", pubdate)+" GMT</pubDate>\n"
-                line += "            <description>\n"
-            # Write subsequent lines to the file. If we are truncating
-            # the file and we encouter the first paragraph, write it to
-            # the output file and then quit.
-            elif (flag == False and line[0:2] == "<p"):
-                feed_fd.write(""+line.replace('href="/', 'href="'+base_url+'/').replace('"#fn', '"'+base_url+'/blog/'+html_filename+"#fn").replace("<", "&lt;").replace(">", "&gt;"))
-                break
+        # Check the first two lines of the structure file for a
+        # class tag denoting the type of article. If viewing an
+        # original article, truncate it at the first paragraph by
+        # setting the flag, "flag", to False
+        # print(i,":",line)
+        if (i == 0):
+            if ("class=\"original\"" in line):
+                flag = False
+                link = conf.base_url+"/blog/"+line.split("href=\"")[1].split(" ")[0][:-1]
             else:
-                line = ""+line.replace('href="/', 'href="'+base_url+'/').replace('"#fn', '"'+base_url+'/blog/'+html_filename+"#fn").replace("<", "&lt;").replace(">", "&gt;")
+                link = line.split("href=\"")[1].split(" ")[0][:-1]
+            if (link[0:4] != "http"):
+                link = "http://"+link
+            line = "            <title>"+line.split("\">")[1][:-4]+"</title>\n"
+            line += "            <link>"+link+"</link>\n"
+            line += "            <guid isPermaLink='true'>"+link+"</guid>\n"
+        elif (i == 1):
+            continue
+        elif (i == 2):
+            pubdate = gmtime(mktime(strptime(line[16:26]+" "+line.split("</a>")[-1][4:-11], "%Y-%m-%d %H:%M:%S")))
+            line = "            <pubDate>"+strftime("%a, %d %b %Y %H:%M:%S", pubdate)+" GMT</pubDate>\n"
+            line += "            <description>\n"
+        # Write subsequent lines to the file. If we are truncating
+        # the file and we encouter the first paragraph, write it to
+        # the output file and then quit.
+        elif (flag == False and line[0:2] == "<p"):
+            feed_fd.write(""+line.replace('href="/', 'href="'+conf.base_url+'/').replace('"#fn', '"'+conf.base_url+'/blog/'+html_filename+"#fn").replace("<", "&lt;").replace(">", "&gt;"))
+            break
+        else:
+            line = ""+line.replace('href="/', 'href="'+conf.base_url+'/').replace('"#fn', '"'+conf.base_url+'/blog/'+html_filename+"#fn").replace("<", "&lt;").replace(">", "&gt;")
 
-            # Stop copying content at the end of the article.
-            if ("&lt;/article&gt;" in line):
-                break
-    
-            # Write all lines from the structure file to the output file
-            # by default.
-            feed_fd.write(line+'\n')
+        # Stop copying content at the end of the article.
+        if ("&lt;/article&gt;" in line):
+            break
+
+        # Write all lines from the structure file to the output file
+        # by default.
+        feed_fd.write(line+'\n')
+    source_fd.close()
 
     # Once we have reached the end of the content in the case of a linkpost,
-    # or read the first paragraph in the case of an original article, add a 
+    # or read the first paragraph in the case of an original article, add a
     # "read more" link and close the article.
-    # feed_fd.write("\n                <p class='read_more_paragraph'>\n                    <a style='text-decoration:none;' href='%s/blog/%s'>Read more...</a>\n                </p>\n".replace("<", "&lt;").replace(">", "&gt;") % (base_url, html_filename))
-    feed_fd.write("\n<p class='read_more_paragraph'>\n<a style='text-decoration:none;' href='%s/blog/%s'>Read more...</a>\n</p>\n".replace("<", "&lt;").replace(">", "&gt;") % (base_url, html_filename))
+    feed_fd.write("\n<p class='read_more_paragraph'>\n<a style='text-decoration:none;' href='%s/blog/%s'>Read more...</a>\n</p>\n".replace("<", "&lt;").replace(">", "&gt;") % (conf.base_url, html_filename))
     feed_fd.write("            </description>\n        </item>\n")
     feed_fd.close()
 
-    del html_filename, flag, feed_fd
+    # Cleanup
+    del html_filename, flag, feed_fd, source_fd
 
 # Method: BuildFromTemplate
 # Purpose: Build a target file, with a specified title and body id, and
@@ -206,12 +407,13 @@ def BuildFromTemplate(target, title, bodyid, description="", sheets="", passed_c
     global content
 
     # Clear the target file, then write the opening HTML code and any passed content.
-    fd = open(target, "w").close()
-    fd = open(target, "a")
+    open(target, "w", encoding=ENCODING).close()
+    fd = open(target, "a", encoding=ENCODING)
     fd.write(content[0].replace("{{META_DESC}}", description).replace("{{ title }}", title).replace("{{ BODYID }}", bodyid, 1).replace("<!-- SHEETS -->", sheets, 1))
     fd.write(passed_content)
     fd.close()
 
+    # Cleanup
     del fd
 
 # Method: CheckDirAndCreate
@@ -234,10 +436,11 @@ def CloseTemplateBuild(target, scripts=""):
     global content
 
     # Write the trailing HTML tags from the template to the target file.
-    fd = open(target, "a")
+    fd = open(target, "a", encoding=ENCODING)
     fd.write(content[1].replace("<!-- SCRIPTS BLOCK -->", scripts))
     fd.close()
 
+    # Cleanup
     del fd
 
 # Method: HandleYear
@@ -245,17 +448,16 @@ def CloseTemplateBuild(target, scripts=""):
 # Parameters: none
 def HandleYear(year):
     # Make global variables accessible in the method, and initialize method variables.
-    global files
-    global content
+    global files, content
 
     # For each year in which a post was made, generate a 'year' file, that
     # contains links to each month in which a post was published.
 
     # Clear the 'year' file
-    year_fd = open("./local/blog/"+year+".html", "w").close()
-    year_fd = open("./local/blog/"+year+".html", "a")
+    year_fd = open("./local/blog/"+year+".html", "w", encoding=ENCODING).close()
+    year_fd = open("./local/blog/"+year+".html", "a", encoding=ENCODING)
     # Write the opening HTML tags
-    year_fd.write(content[0].replace("{{ title }}", "Post Archives - ").replace("{{ BODYID }}", "archives", 1).replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("explore.html", "../explore.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1))
+    year_fd.write(content[2].replace("{{ title }}", "Post Archives - ").replace("{{ BODYID }}", "archives", 1))
     # Insert a 'big table' into the document, to better display the months listed.
     year_fd.write("""<table style="width:100%;padding:20pt 0;" id="big_table">""")
     year_fd.write("    <tr>\n        <td>%s</td>\n    </tr>\n" % (year))
@@ -266,17 +468,17 @@ def HandleYear(year):
         # Add a link to the month, to the year file it belongs to.
         year_fd.write("    <tr>\n        <td><a href=\"%s\">%s</a></td>\n    </tr>\n" % (year+"-"+month+".html", months[month]))
         # Clear the 'month' file
-        month_fd = open("./local/blog/"+year+"-"+month+".html", "w").close()
-        month_fd = open("./local/blog/"+year+"-"+month+".html", "a")
+        month_fd = open("./local/blog/"+year+"-"+month+".html", "w", encoding=ENCODING).close()
+        month_fd = open("./local/blog/"+year+"-"+month+".html", "a", encoding=ENCODING)
         # Write the opening HTML tags
-        month_fd.write(content[0].replace("{{ title }}", "Post Archives - ").replace("{{ BODYID }}", "archives", 1).replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("explore.html", "../explore.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1).replace("<!--BLOCK HEADER-->", "<article>\n<p>\n"+months[month]+", <a href=\""+year+".html\">"+year+"</a>\n</p>\n</article>", 1))
-        
+        month_fd.write(content[2].replace("{{ title }}", "Post Archives - ").replace("{{ BODYID }}", "archives", 1).replace("<!--BLOCK HEADER-->", "<article>\n<p>\n"+months[month]+", <a href=\""+year+".html\">"+year+"</a>\n</p>\n</article>", 1))
+
         # Sort the sub-dictionaries by keys, days, then iterate over it.
         for day in sorted(files[year][month], reverse=True):
             # Sort the sub-dictionaries by keys, timestamps, then iterate over it
             for timestamp in sorted(files[year][month][day], reverse=True):
                 # If a structure file already exists, don't rebuild the HTML file for individual articles
-                if (not isfile("./local/blog/"+files[year][month][day][timestamp].lower().replace(" ","-")[0:-3]+"html")):                        
+                if (not isfile("./local/blog/"+files[year][month][day][timestamp].lower().replace(" ","-")[0:-3]+"html")):
                     article_title = GenPage(files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
                 else:
                     if (CompareMtimes("./Content/"+files[year][month][day][timestamp], "./local/blog/"+files[year][month][day][timestamp].lower().replace(" ","-")[0:-3]+"html")):
@@ -286,19 +488,20 @@ def HandleYear(year):
                         # identify the file in the dictionary, and the passed time values
                         # designate the desired update time to set the content file.
                         article_title = GenPage(files[year][month][day][timestamp], "%s/%s/%s %s" % (year, month, day, timestamp))
-                
+
                 # For each article made in the month, add an entry on the appropriate
                 # 'month' structure file.
                 month_fd.write("<article>\n    %s<a href=\"%s\">%s</a>\n</article>\n" % (year+"/"+month+"/"+day+" "+timestamp+": ", files[year][month][day][timestamp].lower().replace(" ", "-")[0:-3]+"html", article_title.strip()))
-        
+
         # Write closing HTML tags to the month file.
         month_fd.write(content[1].replace("assets/", "../assets/"))
         month_fd.close()
-    
+
     # Write closing HTML tags to the year file.
     year_fd.write("</table>\n"+content[1].replace("assets/", "../assets/"))
     year_fd.close()
 
+    # Cleanup
     del article_title, year_fd, month_fd
 
 # Method: GenBlog
@@ -309,9 +512,11 @@ def GenBlog():
     global files
 
     # file_idx: Current file number. (Int)
-    # buff: [File names, timestamps] for all posts. (List)
+    # buff: [File names, timestamps] for all posts. (List)\
+    # temp: Year placeholder
     file_idx = 0
     file_buffer = []
+    temp = ""
 
     for year in sorted(files, reverse=True):
         for month in sorted(files[year], reverse=True):
@@ -324,7 +529,7 @@ def GenBlog():
         if (file_idx < 25):
             AppendContentOfXToY("./local/blog", fname, timestamp)
         # Write the years in which a post was made to the header element, in a
-        # big table to facilitate easy reading. 
+        # big table to facilitate easy reading.
         elif (file_idx == 25):
             # This block just puts three year entries in the first row, ends
             # the row, and then puts three more year entries in the second row.
@@ -337,7 +542,7 @@ def GenBlog():
             for each in sorted(files, reverse=True)[3:]:
                 buff += """\n        <td>\n            <a href=\"blog/%s\">%s</a>\n        </td>""" % (each.lower()+".html", each)
             buff += """\n    </tr>\n</table>\n</article>\n"""
-            archives_fd = open("./local/archives.html", "a")
+            archives_fd = open("./local/archives.html", "a", encoding=ENCODING)
             archives_fd.write(buff)
             del buff
             archives_fd.write("<article style='text-align:center;padding:20pt;font-size:200%%;'><a href='/blog/%s.html'>%s</a></article>" % (year, year))
@@ -350,7 +555,7 @@ def GenBlog():
         # Add all other articles to the archives page.
         else:
             if (temp != year):
-                archives_fd = open("./local/archives.html", "a")
+                archives_fd = open("./local/archives.html", "a", encoding=ENCODING)
                 archives_fd.write("<article style='text-align:center;padding:20pt;font-size:200%%;'><a href='/blog/%s.html'>%s</a></article>" % (year, year))
                 archives_fd.close()
                 temp = year
@@ -364,7 +569,8 @@ def GenBlog():
 
     GenExplore(choices(file_buffer, k=3))
 
-    del file_idx, file_buffer
+    # Cleanup
+    del file_idx, file_buffer, temp
 
 # Method: GenExplore
 # Purpose: Generate the Explore page
@@ -373,13 +579,17 @@ def GenExplore(files):
     # Start the template build
     BuildFromTemplate("./local/explore.html", "Explore", "explore", description="DESCRIPTION HERE", sheets="", passed_content="")
     # Add intro paragraph
-    with open("./local/explore.html", "a") as fd:
-        fd.write("<article>\n<p>\nEvery time I update this site, new articles appear here. This helps unearth old, unpopular posts that&#160;&#8212;&#160;left alone&#160;&#8212;&#160;no one would ever read again.\n</p>\n</article>")
+    fd = open("./local/explore.html", "a", encoding=ENCODING)
+    fd.write("<article>\n<p>\nEvery time I update this site, new articles appear here. This helps unearth old, unpopular posts that&#160;&#8212;&#160;left alone&#160;&#8212;&#160;no one would ever read again.\n</p>\n</article>")
+    fd.close()
     # Append contents of random files
     for each in files:
         AppendContentOfXToY("./local/explore", each[0], each[1])
     # Close the template build
     CloseTemplateBuild("./local/explore.html")
+
+    # Cleanup
+    del fd
 
 # Method: GenSite
 # Purpose: Generate the blog.
@@ -395,6 +605,9 @@ def GenSite():
     # Write closing HTML Tags to archives.html and blog.html, using Terminate()
     Terminate()
 
+    # Cleanup
+    del pool
+
 # Method: GenPage
 # Purpose: Given a source content file, generate a corresponding HTML structure file.
 # Parameters:
@@ -403,34 +616,35 @@ def GenSite():
 def GenPage(source, timestamp):
     global content
 
-    md.clear()
+    # md.clear()
+    md = Markdown(conf.base_url)
 
     src = "Content/"+source
     dst = "./local/blog/"+source.lower().replace(" ", "-")[0:-3]+"html"
 
     # Ensure source file contains header. If not, use the Migrate() method to generate it.
-    source_fd = open(src, "r")
+    source_fd = open(src, "r", encoding=ENCODING)
     line = source_fd.readline()
     if (line[0:5] != "Type:"):
         Migrate(source, timestamp)
     source_fd.close()
-    
+
     # Open the source file in read mode.
-    source_fd = open(src, "r")
+    source_fd = open(src, "r", encoding=ENCODING)
 
     # Use the source file's name to calculate, clear, and re-open the structure file.
-    target_fd = open(dst, "w").close()
-    target_fd = open(dst, "a")
+    target_fd = open(dst, "w", encoding=ENCODING).close()
+    target_fd = open(dst, "a", encoding=ENCODING)
 
     # Insert Javascript code for device detection.
-    local_content = content[0].replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("explore.html", "../explore.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1).replace("{{ BODYID }}", "post",1)
-    
+    local_content = content[2].replace("{{ BODYID }}", "post",1)
+
     # Initialize idx to track line numbers, and title to hold the title block of each article.
     idx = 0
     title = ""
 
     # Iterate over each line in the source content file.
-    for line in iter(source_fd.readline, ""):
+    for i, line in enumerate(source_fd):
         # In the first line, classify the article as a linkpost or an original piece.
         if (idx == 0):
             ptype = line[6:].strip()
@@ -453,7 +667,7 @@ def GenPage(source, timestamp):
         elif (idx == 3):
             # print(line)
             line = line[9:].strip().replace(" ", "/").split("/")
-            title += """\n                    <time datetime="%s-%s-%s" pubdate="pubdate">By <link rel="author">%s</link> on <a href="%s">%s</a>/<a href="%s">%s</a>/%s %s EST</time>""" % (line[0], line[1], line[2], byline, line[0]+".html", line[0], line[0]+"-"+line[1]+".html", line[1], line[2], line[3])
+            title += """\n                    <time datetime="%s-%s-%s" pubdate="pubdate">By <link rel="author">%s</link> on <a href="%s">%s</a>/<a href="%s">%s</a>/%s %s EST</time>""" % (line[0], line[1], line[2], conf.byline, line[0]+".html", line[0], line[0]+"-"+line[1]+".html", line[1], line[2], line[3])
         # In the fifth line of the file, we're reading the author line. Since we don't do anything
         # with this, pass.
         elif (idx == 4):
@@ -465,21 +679,21 @@ def GenPage(source, timestamp):
         # generated up to this point. Then write the first paragraph, parsed.
         elif (idx == 6):
             target_fd.write(local_content.replace("{{META_DESC}}", line.replace('"', "&#34;").strip()).strip())
-            del local_content
             target_fd.write("\n"+title.strip())
             target_fd.write("\n"+md.html(line).strip())
         # For successive lines of the file, parse them as Markdown and write them to the file.
         elif (idx > 5):
             # print(src)
-            target_fd.write("\n"+md.html(line).strip())
+            target_fd.write("\n"+md.html(line).rstrip('\n'))
 
         # Increase the line number
         idx += 1
     else:
         # At the end of the file, write closing HTML tags.
+        target_fd.write("\n"+md.html("{EOF}"))
         target_fd.write("\n</div>\n                </article>")
         target_fd.write(content[1].replace("assets/", "../assets/").replace("<!-- SCRIPTS BLOCK -->", """""",1))
-        
+
     # Close file descriptors.
     target_fd.close()
     source_fd.close()
@@ -487,7 +701,8 @@ def GenPage(source, timestamp):
     mtime = stat("./Content/"+source).st_mtime
     utime(dst, (mtime, mtime))
 
-    del src, dst, source_fd, idx, title, target_fd, mtime
+    # Cleanup
+    del src, dst, source_fd, idx, title, target_fd, mtime, local_content, ptype, md
 
     return article_title
 
@@ -495,100 +710,32 @@ def GenPage(source, timestamp):
 # Purpose: Create home, projects, and error static structure files.
 # Parameters: none
 def GenStatic():
-    global full_name
     # Reference the index.html source file to generate the front-end structure file.
-    fd = open("system/index.html", "r")
+    fd = open("system/index.html", "r", encoding=ENCODING)
     home = fd.read().split("<!-- DIVIDER -->")
     fd.close()
     BuildFromTemplate(target="./local/index.html", title="", bodyid="home", description="DESCRIPTION HERE", sheets=home[0], passed_content=home[1])
     del home
 
     # Reference the projects.html source file to generate the front-end structure file.
-    fd = open("system/projects.html", "r")
+    fd = open("system/projects.html", "r", encoding=ENCODING)
     projects = fd.read().split("<!-- DIVIDER -->")
     fd.close()
     BuildFromTemplate(target="./local/projects.html", title="Projects - ", bodyid="projects", description="DESCRIPTION HERE", sheets="", passed_content=projects[1])
     del projects
 
     # Reference the disclaimers.html source file to generate the front-end structure fule.
-    fd = open("system/disclaimers.html", "r")
+    fd = open("system/disclaimers.html", "r", encoding=ENCODING)
     disclaimers = fd.read().split("<!-- DIVIDER -->")
-    BuildFromTemplate(target="./local/disclaimers.html", title="Disclaimers - ", bodyid="disclaimers", description="DESCRIPTION HERE", sheets="", passed_content=disclaimers[1].replace("{{NAME}}", full_name))
     fd.close()
+    BuildFromTemplate(target="./local/disclaimers.html", title="Disclaimers - ", bodyid="disclaimers", description="DESCRIPTION HERE", sheets="", passed_content=disclaimers[1].replace("{{NAME}}", conf.full_name))
     del disclaimers
 
     # Build the 404.html file.
     BuildFromTemplate(target="./local/404.html", title="Error - ", bodyid="error", description="DESCRIPTION HERE", sheets="", passed_content="")
 
+    # Cleanup
     del fd
-
-# Method: GetUserInput
-# Purpose: Accept user input and perform basic bounds checking
-# Parameters:
-# - prompt: Text to prompt the user for input (String)
-def GetUserInput(prompt):
-    global c
-
-    from tty import setraw, setcbreak # Raw input
-    import termios
-
-    def CommandLine(prompt):
-        backup = termios.tcgetattr(stdin)
-
-        setraw(stdin)
-        input = ""
-        index = 0
-        while True: # loop for each character
-            # Print current input-string with prompt
-            stdout.write(u"\u001b[1000D")
-            stdout.write(u"\u001b[0K")
-            stdout.write(prompt+" "+input)
-            stdout.write(u"\u001b[1000D")
-            stdout.write(u"\u001b[" + str(index+len(prompt)+1) + "C")    
-            stdout.flush()
-            char = ord(stdin.read(1)) # read one char and get char code
-            
-            # Manage internal data-model
-            if char == 3: # CTRL-C
-                termios.tcsetattr(stdin, termios.TCSAFLUSH, backup)
-                return
-            elif 32 <= char <= 126: # Normal letters
-                input = input[:index] + chr(char) +  input[index:]
-                index += 1
-            elif char in {10, 13}: # Enter key
-                index = 0
-                termios.tcsetattr(stdin, termios.TCSAFLUSH, backup)
-                break
-            elif char == 27: # Arrow keys
-                next1, next2 = ord(stdin.read(1)), ord(stdin.read(1))
-                if next1 == 91:
-                    if next2 == 68: # Left
-                        index = max(0, index - 1)
-                    elif next2 == 67: # Right
-                        index = min(len(input), index + 1)
-            elif char == 127: # Delete
-                input = input[:index-1] + input[index:]
-                index -= 1
-            stdout.flush()
-
-        stdout.write('\n')
-        stdout.write(u"\u001b[1000D")
-        return input
-
-    # Prompt the user for valid input
-    while True:
-        # string = input(prompt)
-        string = CommandLine(prompt)
-
-        # Do not allow empty strings
-        if (len(string) == 0):
-            print(c.WARNING+"Input cannot be empty."+c.ENDC)
-        # Do not allow more than 64 characters
-        elif (len(string) > 64):
-            print(c.WARNING+"Input bound exceeded."+c.ENDC)
-        # If we get here, we have valid input
-        break
-    return string
 
 # Method: GetTitle
 # Purpose: Return the article title of a source file.
@@ -598,18 +745,19 @@ def GetTitle(source, timestamp):
     src = "Content/"+source
 
     # Ensure source file contains header. If not, use the Migrate() method to generate it.
-    source_fd = open(src, "r")
+    source_fd = open(src, "r", encoding=ENCODING)
     line = source_fd.readline()
     if (line[0:5] != "Type:"):
         source_fd.close()
         Migrate(source, timestamp)
-    
+
     # Open the source file in read mode.
-    source_fd = open(src, "r")
+    source_fd = open(src, "r", encoding=ENCODING)
     source_fd.readline()
     title = source_fd.readline()[7:]
     source_fd.close()
 
+    # Cleanup
     del src, source_fd, line
 
     return title
@@ -621,9 +769,6 @@ def GetTitle(source, timestamp):
 #          Make sure ./local exists.
 # Parameters: none
 def Init():
-    # Make global variables accessible
-    global base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url
-
     # Check for the existence of a ".config" file, which contains config info.
     # On error, notify the user, create the file, and prompt the user to fill it out.
     if (not isfile("./.config")):
@@ -644,20 +789,22 @@ def Init():
             print(c.UNDERLINE+"Instagram URL"+c.ENDC+": The URL to your Instagram profile.")
             print()
 
-            base_url = GetUserInput("Base URL: ").rstrip("/")
-            byline = GetUserInput("Byline: ")
-            full_name = GetUserInput("Full name: ")
-            meta_keywords = GetUserInput("Keywords: ")
-            meta_appname = GetUserInput("App name: ")
-            twitter_url = GetUserInput("Twitter URL: ")
-            insta_url = GetUserInput("Instagram URL: ")
-            with open("./.config", "w") as fd:
-                fd.write("# FirstCrack configuration document\n# The following variables are required:\n## base_url - The base URL for your website, i.e. https://zacs.site\n## byline - The name of the author, as it will display on all posts\n## full_name - The full, legal name of the content owner.\n## meta_keywords - Any additional keywords you would like to include in the META keywords tag\n## meta_appname - The desired app name, stored in a META tag\n## twitter - URL to your Twtitter profile\n## instagram - URL to your Instagram profile\nbase_url = %s\nbyline = %s\nfull_name = %s\nmeta_keywords = %s\nmeta_appname = %s\ntwitter = %s\ninstagram = %s" % (base_url, byline, full_name, meta_keywords, meta_appname, twitter_url, insta_url))
-        elif (res == "n"):
+            conf.base_url = GetUserInput("Base URL: ").rstrip("/")
+            conf.byline = GetUserInput("Byline: ")
+            conf.full_name = GetUserInput("Full name: ")
+            conf.meta_keywords = GetUserInput("Keywords: ")
+            conf.meta_appname = GetUserInput("App name: ")
+            conf.twitter_url = GetUserInput("Twitter URL: ")
+            conf.insta_url = GetUserInput("Instagram URL: ")
+            fd = open("./.config", "w", encoding=ENCODING)
+            fd.write("# FirstCrack configuration document\n# The following variables are required:\n## base_url - The base URL for your website, i.e. https://zacs.site\n## byline - The name of the author, as it will display on all posts\n## full_name - The full, legal name of the content owner.\n## meta_keywords - Any additional keywords you would like to include in the META keywords tag\n## meta_appname - The desired app name, stored in a META tag\n## twitter - URL to your Twtitter profile\n## instagram - URL to your Instagram profile\nbase_url = %s\nbyline = %s\nfull_name = %s\nmeta_keywords = %s\nmeta_appname = %s\ntwitter = %s\ninstagram = %s" % (conf.base_url, conf.byline, conf.full_name, conf.meta_keywords, conf.meta_appname, conf.twitter_url, conf.insta_url))
+            fd.close()
+        else:
             print(c.FAIL+"Configuration file not created."+c.ENDC)
             print(c.WARNING+"Please run again."+c.ENDC)
             exit(0)
 
+        # Cleanup
         del res
 
         # Remove the migration script.
@@ -667,30 +814,32 @@ def Init():
     # On success, extract values and store them for use when building the site.
     else:
         # Open the './.config' file
-        with open("./.config", "r") as fd:
-            for line in fd:
-                if (line[0] == "#"): # Ignore comments
-                    pass
-                elif (line[0:8] == "base_url"): # Extract base URL for site
-                    base_url = line.split(" = ")[1].strip()
-                elif (line[0:6] == "byline"): # Extract author byline
-                    byline = line.split(" = ")[1].strip()
-                elif (line[0:9] == "full_name"): # Extract author full (legal) name
-                    full_name = line.split(" = ")[1].strip()
-                elif (line[0:13] == "meta_keywords"): # Extract additional site keywords
-                    meta_keywords = line.split(" = ")[1].strip()
-                elif (line[0:12] == "meta_appname"): # Extract app name
-                    meta_appname = line.split(" = ")[1].strip()
-                elif (line[0:7] == "twitter"): # Extract Twitter profile URL
-                    twitter_url = line.split(" = ")[1].strip()
-                elif (line[0:9] == "instagram"): # Extract Instagram profile URL
-                    insta_url = line.split(" = ")[1].strip()
+        fd = open("./.config", "r", encoding=ENCODING)
+        for i, line in enumerate(fd):
+            if (i == 9): # Extract base URL for site
+                conf.base_url = line.split(" = ")[1].strip()
+            elif (i == 10): # Extract author byline
+                conf.byline = line.split(" = ")[1].strip()
+            elif (i == 11): # Extract author full (legal) name
+                conf.full_name = line.split(" = ")[1].strip()
+            elif (i == 12): # Extract additional site keywords
+                conf.meta_keywords = line.split(" = ")[1].strip()
+            elif (i == 13): # Extract app name
+                conf.meta_appname = line.split(" = ")[1].strip()
+            elif (i == 14): # Extract Twitter profile URL
+                conf.twitter_url = line.split(" = ")[1].strip()
+            elif (i == 15): # Extract Instagram profile URL
+                conf.insta_url = line.split(" = ")[1].strip()
+        fd.close()
+
+        # Cleanup
+        del fd
 
     # If any of these values were blank, notify the user and throw an error.
-    if (base_url == "" or byline == "" or full_name == ""):
+    if (conf.base_url == "" or conf.byline == "" or conf.full_name == ""):
         print(c.FAIL+"Error reading settings from './.config'. Please check file configuration and try again."+c.ENDC)
         exit(0)
-    elif (meta_keywords == "" or meta_appname == "" or twitter_url == "" or insta_url == ""):
+    elif (conf.meta_keywords == "" or conf.meta_appname == "" or conf.twitter_url == "" or conf.insta_url == ""):
         print(c.WARNING+"You have not finished initializing the configuration file. Please finish setting up './.config'.")
 
     # Check for existence of system files and Content directory.
@@ -698,11 +847,11 @@ def Init():
     ## Check for the existence of the "./system" directory first...
     if (not isdir("./system")):
         print(c.FAIL+"\"./system\" directory does not exist. Exiting."+c.ENDC)
-        exit(1)
+        exit(0)
     ## ...then for the existence of the Content directory
     if (not isdir("./Content")):
         print(c.FAIL+"\"./Content\" directory does not exist. Exiting."+c.ENDC)
-        exit(1)
+        exit(0)
 
     ## Now ensure crucial system files exist
     for f in ["template.htm", "index.html", "projects.html", "disclaimers.html"]:
@@ -720,28 +869,28 @@ def Init():
     files = {}
 
     # Initialize Markdown Parser
-    md = Markdown(base_url)
+    md = Markdown(conf.base_url)
 
     # Open the template file, split it, modify portions as necessary, and store each half in a list.
-    fd = open("system/template.htm", "r")
+    fd = open("system/template.htm", "r", encoding=ENCODING)
     content = fd.read()
     content = content.split("<!--Divider-->")
     # This line replaces all generics in the template file with values in config file
-    content[0] = content[0].replace("{{META_KEYWORDS}}", meta_keywords).replace("{{META_APPNAME}}", meta_appname).replace("{{META_BYLINE}}", byline).replace("{{META_BASEURL}}", base_url)
+    content[0] = content[0].replace("{{META_KEYWORDS}}", conf.meta_keywords).replace("{{META_APPNAME}}", conf.meta_appname).replace("{{META_BYLINE}}", conf.byline).replace("{{META_BASEURL}}", conf.base_url)
     # This line replaces placeholders with social media URLs in the config file
-    content[1] = content[1].replace("{{META_BYLINE}}", full_name).replace("{{TWITTER_URL}}", twitter_url).replace("{{INSTA_URL}}", insta_url)
-    content.append(content[0])
+    content[1] = content[1].replace("{{META_BYLINE}}", conf.full_name).replace("{{TWITTER_URL}}", conf.twitter_url).replace("{{INSTA_URL}}", conf.insta_url)
+    content.append(content[0].replace("index.html", "../index.html", 1).replace("blog.html", "../blog.html", 1).replace("explore.html", "../explore.html", 1).replace("archives.html", "../archives.html", 1).replace("projects.html", "../projects.html", 1))
     fd.close()
 
     # Clear and initialize the archives.html and blog.html files.
     BuildFromTemplate(target="./local/archives.html", title="Post Archives - ", bodyid="postarchives", description="DESCRIPTION HERE", sheets="", passed_content="")
     BuildFromTemplate(target="./local/blog.html", title="Blog - ", bodyid="blog", description="DESCRIPTION HERE", sheets="", passed_content="")
-    
+
     # Clear and initialize the RSS feed
-    fd = open("./local/rss.xml", "w")
-    fd.write("""<?xml version='1.0' encoding='ISO-8859-1' ?>\n<rss version="2.0" xmlns:sy="http://purl.org/rss/1.0/modules/syndication/" xmlns:atom="http://www.w3.org/2005/Atom">\n<channel>\n    <title>%s</title>\n    <link>%s</link>\n    <description>RSS feed for %s's website, found at %s/</description>\n    <language>en-us</language>\n    <copyright>Copyright 2012, %s. All rights reserved.</copyright>\n    <atom:link href="%s/rss.xml" rel="self" type="application/rss+xml" />\n    <lastBuildDate>%s GMT</lastBuildDate>\n    <ttl>5</ttl>\n    <generator>First Crack</generator>\n""" % (byline, base_url, byline, base_url, byline, base_url, datetime.datetime.utcnow().strftime("%a, %d %b %Y %I:%M:%S")))
+    fd = open("./local/rss.xml", "w", encoding=ENCODING)
+    fd.write("""<?xml version='1.0' encoding='ISO-8859-1' ?>\n<rss version="2.0" xmlns:sy="http://purl.org/rss/1.0/modules/syndication/" xmlns:atom="http://www.w3.org/2005/Atom">\n<channel>\n    <title>%s</title>\n    <link>%s</link>\n    <description>RSS feed for %s's website, found at %s/</description>\n    <language>en-us</language>\n    <copyright>Copyright 2012, %s. All rights reserved.</copyright>\n    <atom:link href="%s/rss.xml" rel="self" type="application/rss+xml" />\n    <lastBuildDate>%s GMT</lastBuildDate>\n    <ttl>5</ttl>\n    <generator>First Crack</generator>\n""" % (conf.byline, conf.base_url, conf.byline, conf.base_url, conf.byline, conf.base_url, datetime.utcnow().strftime("%a, %d %b %Y %I:%M:%S")))
     fd.close()
-    
+
     # Generate a dictionary with years as the keys, and sub-dictinaries as the elements.
     # These elements have months as the keys, and a list of the posts made in that month
     # as the elements.
@@ -758,89 +907,8 @@ def Init():
                 files[mtime[0]][mtime[1]][mtime[2]][mtime[3]] = {}
             files[mtime[0]][mtime[1]][mtime[2]][mtime[3]] = each
 
+    # Cleanup
     del fd
-
-# Method: Interface
-# Purpose: Provide a command line interface for the script, for more granular control
-# of its operation.
-# Parameters: params: command line parameters (String)
-def Interface(params,search_query="",end_action="continue"):
-    # Store the menu in a variable so as to provide easy access at any point in time.
-    menu = """
-    * To search all articles:                        %s-S%s
-    * To revert post timestamps:                     %s-r%s
-    * To clear all structure files:                  %s-R%s
-    * To display this menu:                          %s-h%s
-    * To exit this mode and build the site:          %sexit%s
-    * To exit this mode and quit the program:        %s!exit%s
-    """ % (c.OKGREEN, c.ENDC, c.OKGREEN, c.ENDC, c.OKGREEN, c.ENDC, c.WARNING, c.ENDC, c.FAIL, c.ENDC, c.FAIL, c.ENDC)
-
-    # Using the "-a" parameter enters Authoring mode, so print(the welcome message)
-    if "-a" in params:
-        print(("""Welcome to First Crack's "Authoring" mode.\n\nEntering "-h" into the prompt at any point in time will display the menu below.\n%s""" % (menu)))
-
-    # Continue prompting the user for input until they enter a valid argument
-    while (True):
-        # If the user entered this mode with the "-a" parameter, prompt them for
-        # new input. Otherwise, proceed with their request.
-        if "-a" in params:
-            query = GetUserInput("#: ")
-        else:
-            query = str(params)
-        params = ""
-
-        # Print(the menu of valid commands to the terminal.)
-        if (search("-h", query) or search("help", query)):
-            print((menu))
-
-        # Search all articles
-        if (search("-S", query) != None):
-            
-            # If one has not been provided, get a string to search all files for
-            if (search_query == ""):
-                search_string = GetUserInput("Enter string to search for: ")
-            else:
-                search_string = search_query
-
-            # Iterate over the entire ./Content dirctory
-            for file in listdir("Content"):
-                # Only inspect text files
-                if (not ".txt" in file):
-                    continue
-
-                # Search each line of the file, case insensitively
-                res = SearchFile(file, search_string)
-                if (res):
-                    print("\nFile: "+c.UNDERLINE+file+c.ENDC)
-                    for match in res:
-                        print("    %sLine %d:%s %s" % (c.BOLD, match[0], c.ENDC, match[1]))
-
-        # Revert post timestamps
-        if (search("-r", query)):
-            for files in listdir("Content"):
-                if (files.endswith(".txt")):
-                    Revert("Content/"+files)
-
-        # Remove all existing structure files
-        if (search("-R", query) != None):
-            for files in listdir("./local/blog"):
-                if (files.endswith(".html")):
-                    remove("./local/blog/"+files)
-            return False
-
-        # Exit the command-line interface and prevent the site from rebuilding.
-        if (search("!exit", query) != None):
-            exit(0)
-        
-        # Exit the command-line interface and proceed with site build.
-        if (search("exit", query) != None) or (search("logout", query) != None):
-            return False
-        # Accept user input again
-        else:
-            if (end_action == "continue"):
-                params = "-a"
-            else:
-                exit(0)
 
 # Method: Migrate
 # Purpose: For files without the header information in their first five lines, generate
@@ -850,7 +918,7 @@ def Interface(params,search_query="",end_action="continue"):
 # - mod_time: Timestamp for reverting update time, format %Y/%m/%d %H:%M:%S. (String)
 def Migrate(target, mod_time):
     # Open the target file and read the first line.
-    fd = open("Content/"+target, "r")
+    fd = open("Content/"+target, "r", encoding=ENCODING)
     article_content = fd.readline()
 
     # Detect a linkpost or an original article, and parse the information appropriately.
@@ -871,10 +939,11 @@ def Migrate(target, mod_time):
     fd.close()
 
     # Clear the target file, then write it's contents into it after the header information.
-    fd = open("Content/"+target, "w")
-    fd.write("""Type: %s\nTitle: %s\nLink: %s\nPubdate: %s\nAuthor: %s\n\n%s""" % (article_type, article_title.strip(), article_url.strip(), mod_time, byline, article_content.strip()))
+    fd = open("Content/"+target, "w", encoding=ENCODING)
+    fd.write("""Type: %s\nTitle: %s\nLink: %s\nPubdate: %s\nAuthor: %s\n\n%s""" % (article_type, article_title.strip(), article_url.strip(), mod_time, conf.byline, article_content.strip()))
     fd.close()
 
+    # Cleanup
     del fd, article_content, article_title, article_url
 
     # Revert the update time for the target file, to its previous value.
@@ -885,36 +954,38 @@ def Migrate(target, mod_time):
 
 # Method: Revert
 # Purpose: Check file timestamp against article timestamp. Correct if necessary.
-# Parameters: 
+# Parameters:
 # - tgt: Target file name (String)
 def Revert(tgt):
-    fd = open(tgt, "r")
+    fd = open(tgt, "r", encoding=ENCODING)
     fd.readline()
     fd.readline()
     fd.readline()
     mod_time = mktime(strptime(fd.readline()[9:].strip(), "%Y/%m/%d %H:%M:%S"))
     fd.close()
-    
+
     if (mod_time != stat(tgt).st_mtime):
         print("Does not match for",tgt)
         print("Reverting to",mod_time)
         utime(tgt, (mod_time, mod_time))
 
+    # Cleanup
     del fd, mod_time
 
 # Method: SearchFile
 # Purpose: Search for a string within a file.
-# Parameters: 
+# Parameters:
 # - tgt: Target file name (String)
 # - q: String to search for (String)
 def SearchFile(tgt, q):
     ret = []
-    with open("Content/"+tgt) as fd:
-        idx = 0
-        for line in fd:
-            if (q.lower() in line.lower()):
-                ret.append([idx, line.strip()])
-            idx += 1
+    fd = open("Content/"+tgt, encoding=ENCODING)
+    idx = 0
+    for i, line in enumerate(fd):
+        if (q.lower() in line.lower()):
+            ret.append([idx, line.strip()])
+        idx += 1
+    fd.close()
     if (len(ret) == 0):
         return False
     return ret
@@ -930,51 +1001,33 @@ def Terminate():
     CloseTemplateBuild("./local/index.html")
     CloseTemplateBuild("./local/disclaimers.html")
     CloseTemplateBuild("./local/404.html", """<script type="text/javascript">document.getElementById("content_section").innerHTML = "<article><h2 style='text-align:center;'>Error: 404 Not Found</h2><p>The requested resource at <span style='text-decoration:underline;'>"+window.location.href+"</span> could not be found.</p></article>"</script>""")
-    
+
     # Write closing tags to the RSS feed.
-    fd = open("./local/rss.xml", "a")
+    fd = open("./local/rss.xml", "a", encoding=ENCODING)
     fd.write("""\n</channel>\n</rss>""")
     fd.close()
 
+    # Cleanup
     del fd
 
 # If run as an individual file, generate the site and report runtime.
 # If imported, only make methods available to imported program.
 if __name__ == '__main__':
-    # If the user just runs the file, notify them that they can use "-a"
-    # to enter "Authoring Mode". Then build the site.
-    if (len(argv) == 1):
-        print(c.UNDERLINE+"Note"+c.ENDC+": You can use '-a' to enter 'Authoring Mode'")
-    # If they have run the program with a single parameter, bounds check
-    # it, then send them to the interface
-    elif (len(argv) == 2):
-        # Don't allow double or single quatation marks, or input over 2
-        # characters long
-        if ('"' in argv[1] or "'" in argv[1] or len(argv[1]) > 2):
-            print(c.FAIL+"Invalid parameters"+c.ENDC)
-            exit(0)
+    ActivateInterface()
 
-        # Send the user to the CLI
-        Interface(argv[1:])
-    
-    # Allow the user to search from the CLI
-    elif (len(argv) == 3 and argv[1] == "-S"):
-        Interface(argv[1],argv[2],"exit")
-
-    else:
-        print(c.FAIL+"Too many parameters"+c.ENDC)
-        exit(0)
-
-    t1 = datetime.datetime.now()
+    t1 = datetime.now()
     Init()
     GenStatic()
     GenSite()
-    
-    # import cProfile
-    # cProfile.run("Init()")
-    # cProfile.run("GenStatic()")
-    # cProfile.run("GenSite()")
 
-    t2 = datetime.datetime.now()
+    # import cProfile
+    # cProfile.run("Init()", "./init.cprof")
+    # cProfile.run("GenStatic()", "./init.cprof")
+    # cProfile.run("GenSite()", "./init.cprof")
+
+    t2 = datetime.now()
 
     print(("Execution time: "+c.OKGREEN+str(t2-t1)+"s"+c.ENDC))
+
+    # Cleanup
+    del t1, t2

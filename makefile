@@ -34,7 +34,7 @@ author:
 # Purpose: Rebuild all structure files.
 # Prerequisites: none
 rebuild:
-	@./blog.py -R
+	@./blog.py -R --exit
 
 # Rule: preview
 # Purpose: Try to open the website in the browser.
