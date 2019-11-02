@@ -416,15 +416,6 @@ def BuildFromTemplate(target, title, bodyid, description="", sheets="", passed_c
     # Cleanup
     del fd
 
-# Method: CheckDirAndCreate
-# Purpose: Check for the existence of a given directory, and create it if it
-#          doesn't exist.
-# Parameters:
-# - tgt: Directory to test and maybe create
-def CheckDirAndCreate(tgt):
-    if (not isdir(tgt)):
-        mkdir(tgt)
-
 # Method: CloseTemplateBuild
 # Purpose: Open the target file and write the closing HTML to it, with an
 #          optional field for inserted scripts.
@@ -637,7 +628,7 @@ def GenPage(source, timestamp):
     target_fd = open(dst, "a", encoding=ENCODING)
 
     # Insert Javascript code for device detection.
-    local_content = content[2].replace("{{ BODYID }}", "post",1)
+    local_content = content[2].replace("{{ BODYID }}", "post",1).replace("assets/", "/assets/")
 
     # Initialize idx to track line numbers, and title to hold the title block of each article.
     idx = 0
@@ -860,16 +851,16 @@ def Init():
             exit(1)
 
     # Make sure ./local exists with its subfolders
-    CheckDirAndCreate("./local")
-    CheckDirAndCreate("./local/blog")
-    CheckDirAndCreate("./local/assets")
+    if (not isdir("./local")):
+        mkdir("./local")
+    if (not isdir("./local/blog")):
+        mkdir("./local/blog")
+    if (not isdir("./local/assets")):
+        mkdir("./local/assets")
 
     # Make global variables accessible in the method, and initialize method variables.
-    global md, files, content
+    global files, content, md
     files = {}
-
-    # Initialize Markdown Parser
-    md = Markdown(conf.base_url)
 
     # Open the template file, split it, modify portions as necessary, and store each half in a list.
     fd = open("system/template.htm", "r", encoding=ENCODING)

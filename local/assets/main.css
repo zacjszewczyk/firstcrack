@@ -44,7 +44,7 @@ h5 {
     font-size: 14pt; }
 h6 {
     font-size: 12pt; }
-.headers span { 
+.headers span {
     display: none; }
 .headers:hover span{
     display: inline; }
@@ -55,9 +55,9 @@ h6 {
     -moz-border-radius-topleft: 10px;
     border-top-left-radius: 10px;
     max-width: 40%; }
-#home #home_link, 
-#blog #blog_link, 
-#explore #explore_link, 
+#home #home_link,
+#blog #blog_link,
+#explore #explore_link,
 #projects #projects_link,
 #postarchives #archives_link,
 #archives #archives_link,
@@ -156,4 +156,20 @@ code {
     h2 {
         line-height: 200%;
     }
+}
+/* Auto dark mode */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #444 !important;
+    color: #e4e4e4;
+  }
+  a, .linkpost, .original {
+    color: #e39777;
+  }
+  img {
+    filter: grayscale(30%);
+  }
+  code {
+    background-color: #666 !important;
+  }
 }
