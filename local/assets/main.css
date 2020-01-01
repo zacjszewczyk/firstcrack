@@ -165,4 +165,7 @@ code {
   code {
     background-color: #666 !important;
   }
+  pre {
+    background-color: #444 !important;
+  }
 }

@@ -386,7 +386,7 @@ class Markdown:
             else:
                 url = __line[1][1:-1]
                 alt = ""
-            return "<div class='image'><img src='%s' alt='%s' title='%s' /></div>" % (url, alt, desc)
+            return "<div class='image'><img src='%s' alt='%s' title='%s' loading='lazy' /></div>" % (url, alt, desc)
         # Handle series index. This is a non-standard Markdown convention that
         # lets the writer reference an external file that contains a list of
         # links to other articles in a related series, and include them
