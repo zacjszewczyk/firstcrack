@@ -1,0 +1,206 @@
+/* Structure */
+/** Zero page **/
+/*** https://bitsofco.de/my-css-reset-base/ ***/
+* { margin: 0; padding: 0; }
+
+body { /** Create grid layout **/
+	display: grid;
+	grid-template-columns: minmax(1%,1fr) minmax(auto, 55em) minmax(1%,1fr);
+	grid-template-rows: min-content 1fr auto;
+	grid-template-areas:
+		"nav nav nav"
+		"lg main rg"
+		"lg footer rg";
+}
+nav { /** Assign nav menu to first row **/
+	grid-area: nav;
+	display: grid;
+	grid-template-columns: repeat(7,1fr);
+	justify-items: center;
+	align-items: center;
+	padding: 3em 0;
+	border-bottom: 1em solid #2A1A0F;
+}
+main { /** Assign main content area to second row **/
+	grid-area: main;
+}
+footer { /** Assign footer to third row **/
+	grid-area: footer;
+}
+#lg, #rg { /* Fill left gutter area */
+	grid-area: lg;
+	height: 100%;
+	width: 100%;
+}
+#rg { /* Fill right gutter area */
+	grid-area: rg;
+}
+
+/** Mobile device adjustments **/
+@media screen and (max-width: 1024px) {
+	nav { /* Compress nav to 2 columns, and shrink spacing */
+		grid-template-columns: repeat(2,1fr);
+		grid-row-gap: 1em;
+		padding: 1em 0;
+	}
+	nav a { /* Space nav elements */
+		padding: 0.1em;
+	}
+	footer p { /* Increase footer line spacing */
+		line-height: 200% !important;
+	}
+}
+
+/* Style */
+/** Global **/
+body {
+	font-family: sans-serif;
+	background: #f9f9f9;
+	font-size: 110%;
+	color: #2A1A0F;
+}
+a {
+    border-bottom: 1pt dashed #2A1A0F;
+    text-decoration: none;
+    color: #696;
+}
+a:hover {
+    color: #2A1A0F;
+    border-bottom: 1pt dotted #696;
+    transition: 0.1s;
+}
+/** Navigation menu **/
+nav a {
+	font-weight: bold;
+	font-size: 110%;
+}
+#home #home_link,
+#blog #blog_link,
+#explore #explore_link,
+#projects #projects_link,
+#postarchives #archives_link,
+#archives #archives_link,
+#disclaimers #disclaimers_link {
+    border: none;
+    color: inherit;
+}
+
+/** Main content area **/
+main {
+	overflow: hidden;
+}
+main table {
+	display: block;
+	text-align: center;
+	overflow: scroll;
+}
+main table tbody {
+	display: inline-block;
+	margin: 0 auto;
+}
+main img {
+	max-width: 100%;
+}
+.image {
+	text-align: center;
+}
+#main_image {
+	float: left;
+	margin: 0em 1em 0em 0;
+	border-top-left-radius: 10px;
+	max-width: 40%;
+	opacity: 0.7;
+	filter: brightness(125%);
+}
+article {
+	margin: 2em 0 0 0;
+}
+.logo {
+	font-size: 85%;
+	margin-left: .5em;
+}
+#year_archive article, #month_archive article {
+	margin: 1em 0;
+}
+#article_title, #article_time {
+	display: block;
+	text-align: center;
+	margin: 1em 0;
+	line-height: 150%;
+}
+.original {
+	border: none;
+}
+h1,h2,h3,h4,h5,h6 {
+	margin: 1em 0;
+}
+h1 span,h2 span,h3 span,h4 span,h5 span,h6 span {
+    visibility: hidden;
+}
+h1:hover span,h2:hover span,h3:hover span,h4:hover span,h5:hover span,h6:hover span {
+    visibility: visible;
+}
+h1 { font-size: 200%; }
+h2 { font-size: 180%; }
+h3 { font-size: 160%; }
+h4 { font-size: 140%; }
+h5 { font-size: 120%; }
+h6 { font-size: 100%; }
+p {
+	margin: 1em 0;
+	line-height: 200%;
+}
+pre, code {
+	background-color: #F1F1F1;
+	font-family: "Courier New";
+	overflow: scroll;
+	border-radius: 0.5em;
+	padding: 1em;
+}
+code {
+	padding: 0 .1em;
+	border-radius: 0.2em;
+}
+ul,ol,blockquote {
+	margin: 1em 0 1em 2em;
+}
+ul li, ol li {
+	line-height: 175%;
+}
+#fn1 {
+	margin-top: 5em;
+	border-top: 1pt dashed;
+	padding-top: 2em;
+}
+
+/** Footer **/
+footer p {
+	text-align: center;
+	margin: .5em;
+	line-height: 100%;
+}
+
+/** Dark mode **/
+@media (prefers-color-scheme: dark) {
+	/*** Global ***/
+	body { /* Off-white text */
+		color: #FEFEFE;
+	}
+	nav { /* Change bottom border color */
+		border-bottom: 1em solid #FEFEFE;
+	}
+	body, nav, nav a, main, #lg, #rg, footer { /* Brown background for everything */
+		background-color: #2A1A0F;
+	}
+	pre, code { /* Light brown background for pre and code elements */
+		background-color: #422918;
+	}
+	a { /* Invert link / link highlight color and style */
+		color: #80bf80;
+		border-bottom: 1pt dashed #FEFEFE;
+	}
+	a:hover {
+		color: #FEFEFE;
+		border-bottom: 1pt dotted #80bf80;
+	}
+}

@@ -1,87 +1,55 @@
-# Reference document: https://www.gnu.org/software/make/manual/make.html
+.PHONY: default # Default rule. Update site.
+.PHONY: verbose # Update site, with verbose flag.
+.PHONY: cli # Enter CLI
+.PHONY: rebuild # Force rebuild entire site.
+.PHONY: timestamp # Reconcile article and publication timestamps, and fix.
+.PHONY: help # Display help menu
+.PHONY: preview # Host local web server to preview local copy of website
+.PHONY: public # Host public web server to preview local copy of website
+.PHONY: deploy # Deploy to Google Firebase, and generate a generic commit message.
+.PHONY: pull # Pull changes from remote source control repository.
 
-# PHONY declarations
-## default - Update the website.
-## author  - Enter First Crack's "Authoring" mode.
-## rebuild - Rebuild all structure files.
-## preview - Try to open the website in the browser.
-## deploy  - Deploy with Google Firebase, and commit changes
-##           to remote source control repository.
-## help	- Display the help menu.
-## pull	- Pull changes from remote repo.
-.PHONY: default
-.PHONY: author
-.PHONY: rebuild
-.PHONY: preview
-.PHONY: deploy
-.PHONY: help
-.PHONY: pull
-
-# Rule: default
-# Purpose: Update the website.
-# Prerequisites:
-# - .config: Create the hidden config file on first run.
-default: .config
+default: Config.json
 	@./blog.py
-
-# Rule: author
-# Purpose: Enter First Crack's "Authoring" mode.
-# Prerequisites: none
-author:
+verbose:
+	@./blog.py -v
+cli:
 	@./blog.py -a
-
-# Rule: rebuild
-# Purpose: Rebuild all structure files.
-# Prerequisites: none
 rebuild:
-	@./blog.py -R --exit
+	@./blog.py -R
+timestamp:
+	@./blog.py -r
+help:
+	@echo "make default   - Default rule. Update site."
+	@echo "make verbose   - Update site, with verbose output."
+	@echo "make cli       - Enter the command line interface."
+	@echo "make rebuild   - Force rebuild entire site."
+	@echo "make timestamp - Make article and post publication timestamps match."
+	@echo "make help      - Display this help menu."
+	@echo ""
+	@echo "make preview   - Host local web server to preview local website."
+	@echo "                 \033[1mNote:\033[0m this web server is only available to you."
+	@echo "make public    - Host public web server to preview local website."
+	@echo "                 \033[1mNote:\033[0m this web server is available to your entire network. Use"
+	@echo "                 to view your local website on other devices, and with caution."
+	@echo ""
+	@echo "make deploy    - Deploy to Google Firebase, and update source control."
+	@echo "make pull      - Pull changes from remote source control repository."
+	@echo ""
 
-# Rule: preview
-# Purpose: Try to open the website in the browser.
-# Prerequisites: none
 preview:
-	-@(open ./local/index.html || firefox ./local/index.html) || echo `date`": No browser found."
+	@./blog.py -p
+public:
+	@./blog.py -P
 
-# Rule: deploy
-# Purpose: Deploy with Google Firebase, and commit changes
-#          to remote source control repository.
-# Prerequisites: none
 deploy:
 	-@firebase deploy 2> /dev/null || echo `date`": No Firebase deployment found."
 	-@(git add . 2> /dev/null && git commit -m "Deployment commit on `date`" && git push) || echo `date`": No local repo found."
-
-# Rule: help
-# Purpose: Display the help menu.
-# Prerequisites: none
-help:
-	@echo "To update your website:                   make"
-	@echo "To rebuild all structure files:           make rebuild"
-	@echo "To enter First Crack's 'Authoring' mode:  make author"
-	@echo "To preview the website in your browser:   make preview"
-	@echo "To deploy with Firebase and update the                "
-	@echo "remote repo:                              make deploy"
-	@echo "To view this help menu again:             make help"
-
-# Rule: .config
-# Purpose: On first run, 1) Display help menu, and
-#                        2) create hidden config file.
-# Prerequisites: none
-.config:
-	@make help
-	@echo
-	@echo "This menu will appear until you finish setup. Use 'make help' to see it again."
-	@echo
-	@echo "Checking system requirements."
-	@./.sys.sh
-	@echo "Done checking system requirements."
-	@echo
-	@echo "First Crack will now prompt you to create the config file. Enter 'y'."
-	@echo
-	@chmod 755 blog.py
-	@touch -m -t 200012312359.59 "./Content/Test Linkpost.txt" 2> /dev/null
-
-# Rule: pull
-# Purpose: Pull changes from remote repo.
-# Prerequisites: none
 pull:
-	git pull https://github.com/zacjszewczyk/Standalone-FirstCrack.git
+	@git pll
+
+Config.json:
+	@echo "First run detected. Please enter the following information:"
+	@chmod 700 ./.setup.sh
+	@./.setup.sh
+	@rm -f ./.setup.sh

@@ -1,7 +1,7 @@
 First Crack - A simple static blogging engine written in Python
 ===============================================================
 
-Given a directory of a thousand [Markdown](http://daringfireball.net/projects/markdown/) files, First Crack will generate a full-featured, lightweight, static website in less than two seconds. For a live demo, check out [my website](https://zacs.site/). I have used First Crack as the back-end for my site since 2011.
+Given a directory of a thousand [Markdown](http://daringfireball.net/projects/markdown/) files, First Crack will generate a full-featured, lightweight, static website in less than two seconds. For a live demo, check out [my website](https://zacs.site/). I have used First Crack exclusively since 2011.
 
 ## Table of Contents
 * [Front-End Features](#front-end-features)
@@ -22,7 +22,7 @@ Given a directory of a thousand [Markdown](http://daringfireball.net/projects/ma
 
 ## Front-End Features
 
-* **Lightweight** - First Crack builds a lightweight, minimalist website. A typical page loads less than 80KB of data--for comparison, a typical Medium post loads over 3000KB.
+* **Lightweight** - First Crack builds a lightweight, minimalist website. A typical page loads less than 10KB of data, including the page itself--for comparison, a typical Medium post loads over 3000KB.
 * **Full-featured** - Who says a static site generator can't have cool features? One of my favorites is the Post Archives. This page makes finding a certain article easy by displaying every post you have ever published. It also allows you to view a list of posts by year and month, too. Each post's byline also includes links to the year and month it was published, so you can easily narrow your search with just a few clicks.
 * **Beautiful blog** - I built First Crack to be a blogging engine, and it remains true to that core today. The blog it builds presents clean articles in an aesthetically pleasing manner, whether viewed on a large desktop computer of a small mobile phone. I designed the default layout to remove the need for "Reader Views", by showing you exactly what you need and nothing you don't.
 * **Custom landing page** - I like to think of personal websites as a public resume. As such, they ought to help you put your best foot forward--and First Crack allows you to do just that, with a custom landing page. Use this page to talk about yourself, your projects, and anything else--and let your viewers check out your blog later. Don't make your thoughts on Agile the first thing a new employer sees.
@@ -30,13 +30,13 @@ Given a directory of a thousand [Markdown](http://daringfireball.net/projects/ma
 ## Back-End Features
 
 * **No dependencies** - I wrote First Crack in vanilla Python. First Crack has no dependencies. 
-* **Fast** - I put a lot of work into optimizing every single operation First Crack executes, and it shows: given a thousand unique Markdown files, First Crack will generate individual pages for each article, and archive pages broken up by month and year published, in less than two seconds. As of the June 2019 release, First Crack does this in around 1.25 seconds, with a warm cache.
-* **Easy to use** - To build a website with First Crack, drop a few Markdown files into the `Content` directory and run `blog.py`. That's it, First Crack takes care of the rest.
-* **Platform-agnostic** - Don't worry about spinning up a special server if you use First Crack: even the most basic, bare-bones, underpowered web server can handle serving the static site this engine builds.
+* **Fast** - I put a lot of work into optimizing every single operation First Crack executes, and it shows: given a thousand unique Markdown files, First Crack will generate individual pages for each article, and archive pages broken up by month and year published, in less than two seconds. As of February 2020, First Crack does this in around 1.25 seconds.
+* **Easy to use** - To build a website with First Crack, drop a few Markdown files into the `content` directory and run `blog.py`. That's it, First Crack takes care of the rest.
+* **Platform-agnostic** - Don't worry about spinning up a special server if you use First Crack: even the most basic, bare-bones, underpowered web server can handle serving the static site it builds.
 
 ## Dependencies
 
-First Crack does not rely on any third-party tools, code, or frameworks. It uses Python 2 or 3, based on whatever you have on your system. 
+First Crack does not rely on any third-party tools, code, or frameworks. It uses Python 3. 
 
 ## Installation
 
@@ -49,36 +49,31 @@ $ cd FirstCrack
 
 That's it.
 
-![Animated gif of the install process](./local/assets/Images/system/install.gif)
-
 ## Directory Structure
 
-On install, First Crack consists of this README, five Python scripts, a `system` directory that houses the content for four static pages, a `Content` directory with two example content files, and a `local` directory where First Crack will store all structure files. For now, `local` just has the main CSS file for the site. Check out the tree below for a more succinct explanation.
+On install, First Crack consists of this README, two Python scripts, a `templates` directory that houses content for static pages and the main content file, a `Content` directory with two example content files, and a `html` directory where First Crack will store all structure files. 
 
 ```
 FirstCrack
-|____README.md # This file.
-|____makefile # A simplified command line interface for First Crack.
-|____blog.py # The blog engine.
-|____Markdown.py # The Markdown parser.
-|____colors.py # ASCII color code function.
-|____ModTimes.py # Method to compare mod times of two input files.
-|____Hash.py # Method to hash two input files and return equality.
+|__ blog.py # Main script.
+|__ CLI.py # Command-line interface code.
+|__ Config.json # Configuration file.
 |
-|____system # Directory containing content used to populate select front-end files.
-| |____index.html # Content for the home page.
-| |____disclaimers.html # Content for the disclaimers page.
-| |____projects.html # Content for the projects page.
-| |____template.htm # Base HTML template file.
+|__ templates # Dir. Template folder.
+|  |__ main.html # Main template file.
 |
-|____Content # Directory containing content files. All must end in .txt.
-| |____Test Linkpost.txt # An example linkpost,
-| |____Test Original Article.txt # An example article.
+|__ content # Dir. Content folder.
+|  |__ *.txt # Content files.
 |
-|____local # Directory for First Crack output. Structure files will go in here.
-| |____blog # Directory containing all article HTML files.
-| |____assets # Directory for images, CSS files, and documents.
-| | |____main.css # The main CSS file for the site.
+|__ html # Dir. Website files.
+|  |__ *.html # Main pages.
+|  |__ blog # Dir. All articles.
+|  |  |__ *.html # Article files.
+|  |__ assets # Dir. Webpage resources.
+|  |  |__ main.css # Main CSS file.
+|  |  |__ manifest.json # JSON mainifest.
+|  |  |__ images # Dir. All images.
+|  |     |__ * # Image files.
 ```
 
 ## Setup
@@ -89,32 +84,23 @@ First Crack requires that you set up a configuration file before it will generat
 $ make
 ```
 
-First Crack will tell you that the configuration file, `./.config`, does not exist. It will then ask if you want to set it up. Answer `y` and hit return. First Crack will not build your website unless you answer each question. If one does not apply to you, enter `None`. 
+First Crack will detect that this is the first time you have run it, then prompt you to answer several questions. These help customize the website it builds for you. If one does not apply to you, enter `None`. 
 
-![Animated gif of the setup process](./local/assets/Images/system/setup.gif)
-
-The config file, `.config`, looks like this:
+The config file, `Config.json`, looks like this:
 
 ```
-# FirstCrack configuration document
-# The following variables are required:
-## base_url - The base URL for your website, i.e. https://zacs.site
-## byline - The name of the author, as it will display on all posts
-## full_name - The full, legal name of the content owner
-## meta_keywords - Any additional keywords you would like to include in the META keywords tag
-## meta_appname - The desired app name, stored in a META tag
-## twitter - URL to your Twtitter profile
-## instagram - URL to your Instagram profile
-base_url = 
-byline = 
-full_name = 
-meta_keywords = 
-meta_appname = 
-twitter = 
-instagram = 
+{
+    "meta_baseurl" : "Base URL for your site",
+    "byline" : "Default article byline",
+    "full_name" : "Full name, user for copyright disclaimer",
+    "meta_keywords" : "Search engine keywords",
+    "meta_appname" : "Title of your website, should it be added as an app to a mobile device",
+    "twitter_url" : "URL to your Twitter profile",
+    "insta_url" : "URL to your Instagram profile"
+}
 ```
 
-You can go back and change these values at any time. First Crack will update your site to reflect that change the next time you run `make` or `./blog.py`. Once you finish filling them out for the first time, First Crack will build your site. Check it out with `open local/index.html`, which will open the local copy in your default browser. 
+You can go back and change these values at any time. First Crack will update your site to reflect that change the next time you run `make` or `./blog.py`. Once you finish filling them out for the first time, First Crack will build your site. Check it out with `make preview`, which will start a local web server and open a local copy of your website in your default browser. 
 
 ## Usage
 
@@ -124,15 +110,13 @@ To build a website with First Crack, enter the following command:
 $ make
 ```
 
-![Animated gif of using First Crack](./local/assets/Images/system/usage.gif)
-
 You can also just run the Python file, with this command:
 
 ```
 $ ./blog.py
 ```
 
-That's it. First Crack ships with two example content files, which it uses to build an example website. View that site by opening the `index.html` file in the `local` directory, or by entering the following command:
+That's it. First Crack ships with two example content files, which it uses to build an example website. View that site by opening the `index.html` file in the `html` directory, or by entering the following command:
 
 ```
 $ make preview
@@ -144,46 +128,44 @@ First Crack builds five pages and one RSS feed out of the box. The diagram below
 
 ```
 YourDomain.com
-|____Home (index.html)
-|____Blog (blog.html)
-| | |____ Test Original Article (test-original-article.html)
-| | |____ Test Linkpost (test-linkpost.html)
-| | |____ ...
-| |____RSS (rss.html)
-| |____Post Archives (archives.html)
-|____Projects (projectx.html)
-|____Disclaimers (disclaimers.html)
+|__Home (index.html)
+|__Blog (blog.html)
+| |____ Test Original Article (test-original-article.html)
+| |____ Test Linkpost (test-linkpost.html)
+| |____ ...
+|__RSS (rss.html)
+|__Post Archives (archives.html)
+|__Projects (projectx.html)
+|__Disclaimers (disclaimers.html)
 ```
 
 ## Advanced Usage
 
-First Crack has a few advanced features that make managing a website easier, which are accessible in the "Authoring" mode. To enter "Authoring" mode, use one of the following commands:
+First Crack has a few advanced features that make managing a website easier, which are accessible in the command line interface. To enter the CLI, use one of the following commands:
 
 ```
-$ make author
+$ make cli
 $ ./blog.py -a
 ```
 
-First Crack will display a menu of available commands, along with an explanation of each. Enter `-h` at any time to view the help menu. First Crack will continue prompting you for input in this mode until you exit it with either `exit` or `!exit`. You can also run any of these commands directly from the command line. For example, to clear all structure files and rebuilt the entire site, use one of the following commands:
+First Crack will display a menu of available commands, along with an explanation of each. Enter `-h` at any time to view the help menu. First Crack will continue prompting you for input in this mode until you exit it with either `exit` or `!exit`. You can also run any of these commands directly from the terminal. For example, to clear all structure files and rebuilt the entire site, use one of the following commands:
 
 ```
 $ make rebuild
 $ ./blog.py -R
 ```
 
-![Animated gif of the authoring process](./local/assets/Images/system/author.gif)
-
 ## Making a New Post
 
-Like everything else, the process for making a new post is simple. See the files in the Content directory for examples of a linkpost and an original article. To make a new post, save a text file in the Content directory and build the site. First Crack will only build files that have changed since you last ran it, and then re-build the blog and archive pages as necessary. 
+Like everything else, the process for making a new post is simple. See the files in the Content directory for examples of a linkpost and an original article. To make a new post, save a text file in the `content` directory and build the site. First Crack will only build files that have changed since you last ran it, and then re-build the blog and archive pages as necessary. 
 
 ## Editing an Existing Post
 
-To edit an existing post, just edit the text file in the `Content` directory, then build the site. First Crack will keep the original publication date, but change the content. You can change the original publication date, title, and author by editing the file's header, and then rebuilding the site. 
+To edit an existing post, just edit the text file in the `content` directory, then build the site. First Crack will now show this post at the top of the blog page, since it is now the most recently updated post. To make updates without affecting post order, update posts and then use `make timestamp` to revert post update times to that of their original publication. You can change the original publication date, title, and author by editing the file's header, and then rebuilding the site. 
 
 ## Editing an Existing Page
 
-First Crack ships with a handful of static pages that live in the `system` folder: `index.html`, `projects.html`, `disclaimers.html`, and `template.htm`. When it builds a website, First Crack gets content for the home page from `index.html`, content for the projects page from `projects.html`, and content for the disclaimers page from `disclaimers.html`. If you want to change any of them, then, just edit those files. Put any JavaScript snippets above the `<!-- DIVIDER -->` line, and the HTML content below it. 
+First Crack ships with a handful of static pages that live in the `templates` folder: `index.html`, `projects.html`, `disclaimers.html`, and `main.html`. When it builds a website, First Crack gets content for the home page from `index.html`, content for the projects page from `projects.html`, and content for the disclaimers page from `disclaimers.html`. If you want to change any of them, just edit those files.
 
 ## Deploying Your Website
 
@@ -191,7 +173,7 @@ If you followed [my guide to running your own website for free with First Crack 
 
 ```
 $ make # Once I add a new article to the Content folder, this updates the site.
-$ make preview # One last check for spelling or other formatting errors. This command opens the home page in my default browser.
+$ make preview # One last check for spelling or other formatting errors. This command starts a local private web server, then opens the home page in my default browser.
 $ make deploy # Deploy the updated site, update the local source control repository, and push that change to GitHub and Bitbucket.
 ```
 
@@ -201,7 +183,7 @@ I started this project in 2011. After trying many of the day's most popular cont
 
 I designed First Crack with ease of use, speed, and versatility in mind. I believe these goals are evident in the engine's dead-simple setup, its ability to build over one thousand pages in less than two seconds, and the lightweight website it produces.
 
-After almost a decade, content management systems have gotten much better since I started this project. I have yet to find anything First Crack cannot do, though, or an engine that wins out in the design goals I mentioned above. I like working on First Crack, and I look forward to adding cool new features in the future.
+After almost a decade, content management systems have gotten much better since I started this project. I have yet to find anything First Crack cannot do, though, or an engine that wins out in the design goals I mentioned above. I like working on First Crack, and I look forward to adding more features in the future.
 
 ## License
 
