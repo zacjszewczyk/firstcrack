@@ -9,6 +9,8 @@ from os.path import exists # Reading input files
 from os import popen, remove # Detect terminal size
 from re import sub # Change menu to try to avoid text wrapping
 from os import listdir # Directory traversal
+from os.path import isfile # Web server
+from time import localtime # Timestamping logs
 
 # Class: c(olors)
 # Purpose: provide access to ANSI escape codes for styling output
@@ -26,22 +28,14 @@ class c():
 # Purpose: Activate the command line interface.
 # Parameters: none.
 def ActivateInterface():
-    # If the user just runs the file, notify them that they can use "-a"
-    # to enter "Authoring Mode". Then build the site.
+    # If the user just runs the file, or only includes "-v" verbose flag, notify
+    # them that "-a" enters command line interface, then build the site.
     if (len(argv) == 1 or len(argv) == 2 and "-v" in argv):
         print(c.UNDERLINE+"Note"+c.ENDC+": You can use '-a' to enter 'Authoring Mode'")
-    # If they have run the program with a single parameter, bounds check
-    # it, then send them to the interface
+    # If they have run the program with up to 2 parameters other than "-v",
+    # open the command line interface.
     elif (len(argv) < 4):
-        # Don't allow double or single quatation marks, or input over 2
-        # characters long
-        if ('"' in argv[1] or "'" in argv[1] or len(argv[1]) > 2):
-            print(c.FAIL+"Invalid parameters"+c.ENDC)
-            exit(0)
-
-        # Send the user to the CLI
         DisplayInterface(argv[1:])
-
     else: # Too many parameters
         print(c.FAIL+"Too many parameters"+c.ENDC)
         exit(0)
@@ -50,18 +44,18 @@ def ActivateInterface():
 # Purpose: Provide a command line interface for the script, for more granular control
 # of its operation.
 # Parameters: params: command line parameters (String)
-def DisplayInterface(params,search_query="",end_action="continue"):
-    # If the exit flag is set, check for other flags, then exit.
-    if ("--exit" in params):
-        end_action = "quit"
-
+def DisplayInterface(params):
     # Store the menu in a variable so as to provide easy access at any point in time.
     menu = f"""
-    * To revert post timestamps:                     {c.OKGREEN}-r{c.ENDC}
-    * To clear all structure files:                  {c.OKGREEN}-R{c.ENDC}
-    * To display this menu:                          {c.WARNING}-h{c.ENDC}
-    * To exit this mode and build the site:          {c.FAIL}exit{c.ENDC}
-    * To exit this mode and quit the program:        {c.FAIL}!exit{c.ENDC}
+    * To clear all structure files:                    {c.OKGREEN}-R{c.ENDC}
+    * To revert post timestamps:                       {c.OKGREEN}-r{c.ENDC}
+    * To display this menu:                            {c.WARNING}-h{c.ENDC}
+    
+    * To host local web server to preview local site:  {c.WARNING}-p{c.ENDC}
+    * To host public web server to preview local site: {c.WARNING}-P{c.ENDC}
+
+    * To exit this mode and build the site:            {c.FAIL}exit{c.ENDC}
+    * To exit this mode and quit the program:          {c.FAIL}!exit{c.ENDC}
     """
 
     # If the terminal window is less than 59 characters wide, resize the menu
@@ -72,33 +66,128 @@ def DisplayInterface(params,search_query="",end_action="continue"):
 
     # Continue prompting the user for input until they enter a valid argument
     while (True):
-        if ("-a" in params): # Get new input
+        if ("-a" in params): # Entered CLI. Prompt for command.
             print(menu)
             params = GetUserInput("#: ")
-        if ("-h" in params or "help" in params): # Print help menu
-            print(f'Entering "-h" at any time will display the menu below.\n{menu}')
-        elif ("-r" in params): # Revert post timestamps
-            print("Reverting post timestamps.")
-            for files in listdir("./content"):
-                if (files.endswith(".txt")):
-                    Revert("./content/"+files)
-        elif ("-R" in params): # Rebuild all structure files
-            print("Rebuilding all structure files.")
+        if ("-R" in params): # Rebuild all structure files
+            print(" - Clearing structure files... ", end="", flush=True)
             for file in listdir("./html/blog"):
                 if (file.endswith(".html")):
                     remove("./html/blog/"+file)
-            return False
+            print(f"{c.OKGREEN}done.{c.ENDC}")
+            break
+        elif ("-r" in params): # Revert post timestamps
+            print(" - Reverting post timestamps... ", end="", flush=True)
+            for files in listdir("./content"):
+                if (files.endswith(".txt")):
+                    Revert("./content/"+files)
+            print(f"{c.OKGREEN}done.{c.ENDC}")
+        elif ("-h" in params or "help" in params): # Print help menu
+            print(f'Entering "-h" at any time will display the menu below.\n{menu}')
+        elif ("-p" in params or "-P" in params): # Web server
+            from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+            
+            # Clear log file
+            open("./server.log", "w").close()
+
+            # Setup the request handler
+            class GetHandler(BaseHTTPRequestHandler):
+                def do_GET(self): # Handle GET requests
+                    # Transform request for root to request for index.html
+                    if (self.path == "/"):
+                        self.path = "/index.html"
+                    
+                    # Strip leading / from request
+                    resource = self.path[1:]
+                    
+                    # Test for file existence
+                    if (isfile(f"./html/{resource}")):
+                        # If file exists, send 200 code and appropriate content
+                        # header based on file type.
+                        self.send_response(200)
+                        extension = resource.rsplit(".", 1)[-1]
+                        if (extension == "css"):
+                            self.send_header('Content-Type','text/css; charset=utf-8')
+                        elif (extension == "html"):
+                            self.send_header('Content-Type','text/html; charset=utf-8')
+                        elif (extension == "xml"):
+                            self.send_header('Content-Type','text/xml; charset=utf-8')
+                        elif (extension == "jpg"):
+                            self.send_header('Content-Type','image/jpg')
+                        elif (extension == "ico"):
+                            self.send_header('Content-Type','image/ico')
+                        else:
+                            self.send_header('Content-Type','text/plain; charset=utf-8')
+                        self.end_headers()
+
+                        # Serve file
+                        fd = open(f"./html/{resource}", "rb")
+                        for i,line in enumerate(fd):
+                            self.wfile.write(line)
+                        fd.close()
+                    # If file does not exist, send 404 code and serve 404 page.
+                    else:
+                        self.send_response(404)
+                        self.send_header('Content-Type','text/html; charset=utf-8')
+                        self.end_headers()
+                        fd = open(f"./html/404.html", "rb")
+                        for i,line in enumerate(fd):
+                            self.wfile.write(line)
+                        fd.close()
+
+                # Send no response if client uses one of these valid but 
+                # unsupported HTTP methods.
+                def do_HEAD(self):
+                    return False
+                def do_POST(self):
+                    return False
+                def do_PUT(self):
+                    return False
+                def do_DELETE(self):
+                    return False
+                def do_CONNECT(self):
+                    return False
+                def do_OPTIONS(self):
+                    return False
+                def do_TRACE(self):
+                    return False
+                def do_PATCH(self):
+                    return False
+
+                def log_request(self, code):
+                    server_fd = open("./server.log", "a")
+                    server_fd.write(f"{self.client_address[0]} - - [{self.log_date_time_string()}] {self.requestline} {code} -\n")
+                    server_fd.close()
+                    print(f"{self.client_address[0]} - - [{self.log_date_time_string()}] {self.requestline} {code} -")
+
+            # Make web server public or private, and notify user
+            if ("-p" in params):
+                server_address = ("127.0.0.1", 8000)
+                print(f"Serving {c.OKGREEN}private{c.ENDC} web server at port {c.OKGREEN}8000{c.ENDC}. Use {c.BOLD}CTRL-C{c.ENDC} to exit.")
+            else:
+                server_address = ("0.0.0.0", 8000)
+                print(f"Serving {c.WARNING}public{c.ENDC} web server at port {c.OKGREEN}8000{c.ENDC}. Use {c.BOLD}CTRL-C{c.ENDC} to exit.")
+            # Serve web server forever
+            httpd = ThreadingHTTPServer(server_address, GetHandler)
+            try:
+                httpd.serve_forever()
+            except KeyboardInterrupt:
+                print(f"\r{c.OKGREEN}Exiting.{c.ENDC}")
+                server_fd = open("./server.log", "a")
+                server_fd.write(f"- - - [{localtime().tm_mday}/{localtime().tm_mon}/{localtime().tm_year} {localtime().tm_hour}:{localtime().tm_min}:{localtime().tm_sec}] Graceful shutdown - -\n")
+                server_fd.close()
+                httpd.shutdown()
+                exit(0)
+
         elif ("!exit" in params): # Exit without building site
             exit(0)
         else: # Exit then build site
-            return False
-
-        if (end_action == "continue"):
-            params = GetUserInput("#: ")
-        else:
-            # Cleanup
-            del menu
             break
+
+        # Unless "--exit" flag is supplied, prompt user for more input.
+        if ("--exit" in params):
+            exit(0)
+        params = GetUserInput("#: ")
 
 # Method: GetUserInput
 # Purpose: Accept user input and perform basic bounds checking
