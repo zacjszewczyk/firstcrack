@@ -27,7 +27,7 @@ help:
 	@echo "make timestamp - Make article and post publication timestamps match."
 	@echo "make help      - Display this help menu."
 	@echo ""
-	@echo "make preview   - Host local web server to preview local website."
+	@echo "make private   - Host local web server to preview local website."
 	@echo "                 \033[1mNote:\033[0m this web server is only available to you."
 	@echo "make public    - Host public web server to preview local website."
 	@echo "                 \033[1mNote:\033[0m this web server is available to your entire network. Use"
@@ -38,9 +38,9 @@ help:
 	@echo ""
 
 preview:
-	@./blog.py -p
+	@./blog.py -p --exit
 public:
-	@./blog.py -P
+	@./blog.py -P --exit
 
 deploy:
 	-@firebase deploy 2> /dev/null || echo `date`": No Firebase deployment found."
