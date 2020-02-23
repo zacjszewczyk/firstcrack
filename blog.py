@@ -25,7 +25,7 @@ MONTHS = {"01":"January","02":"February","03":"March","04":"April","05":"May","0
 # Purpose: Facilitate multiprocessing of year indexes
 # Parameters:
 # - year: Year index to build (String)
-# Return: True (Operation succeeds), False (Operation fails)
+# Return: True (Operation completes), False (Operation fails)
 def BuildByYear(year):
     # For each year in which a post was made, generate a 'year' file, that
     # contains links to each month in which a post was published.
@@ -78,7 +78,7 @@ def BuildByYear(year):
 # Parameters:
 # - content_file: Name of the source file (String)
 # - title: Output page title. Optional (String)
-# Return: True (Operation succeeds), False (Operation fails)
+# Return: True (Operation completes), False (Operation fails)
 def BuildFromTemplate(content_file,title):
     if (title == "Index"): title = "Home" # Fix title for home page
     # Clear, then open output file
@@ -139,7 +139,7 @@ def GetContent(content_file):
 
 # Method: Migrate
 # Purpose: For files without the header information in their first five lines, generate
-#          that information, insert it into the file, and revert the update time.
+# that information, insert it into the file, and revert the update time.
 # Parameters
 # - content_file: Path to content file. (String)
 def Migrate(content_file):
