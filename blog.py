@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
-# Imports 
-from multiprocessing import Pool # Multiprocessing
+# Imports
+from concurrent.futures import ProcessPoolExecutor # Multiprocessing
 from os import listdir, stat, mkdir, utime # File/folder operations
 from os.path import isfile, isdir # File/folder operations
 from time import localtime, strftime, strptime, mktime, gmtime # Mod time operations
@@ -16,7 +16,7 @@ from random import choices # Explore page
 ## MAX_PROCESSES: Process limit (Int)
 ## ENCODING: File system encoding (String)
 ## MONTHS: A map of month numbers to names (Dictionary)
-BASE_DIR = "./"
+BASE_DIR = "/Users/zjszewczyk/Dropbox/Code/Standalone/"
 MAX_PROCESSES = 16
 ENCODING = getpreferredencoding()
 MONTHS = {"01":"January","02":"February","03":"March","04":"April","05":"May","06":"June","07":"July","08":"August","09":"September","10":"October","11":"November","12":"December"}
@@ -26,7 +26,7 @@ MONTHS = {"01":"January","02":"February","03":"March","04":"April","05":"May","0
 # Parameters:
 # - year: Year index to build (String)
 # Return: True (Operation completes), False (Operation fails)
-def BuildByYear(year,stats,files):
+def BuildByYear(year):
     # For each year in which a post was made, generate a 'year' file, that
     # contains links to each month in which a post was published.
 
@@ -54,7 +54,7 @@ def BuildByYear(year,stats,files):
         for day in sorted(files[year][month], reverse=True):
             # Sort the sub-dictionaries by keys, timestamps, then iterate over it
             for timestamp in sorted(files[year][month][day], reverse=True):
-                fd = open(BASE_DIR+"content/"+files[year][month][day][timestamp], "r", encoding=ENCODING)
+                fd = open(BASE_DIR+"Content/"+files[year][month][day][timestamp], "r", encoding=ENCODING)
                 article_title = fd.readlines()[1][7:]
                 fd.close()
                 # For each article made in the month, add an entry on the appropriate
@@ -104,8 +104,7 @@ def BuildFromTemplate(content_file,title):
 # Parameters:
 # - content_file: Target content file (String)
 # Return: [title, link, mtime, structure_file, content]
-def GetContent(*content_file):
-    content_file = "".join(content_file)
+def GetContent(content_file):
     structure_file = content_file.lower().replace(' ', '-')[0:-3]+'html'
     # Open structure file
     fd = open(f"./html/blog/{structure_file}", "r", encoding=ENCODING)
@@ -161,7 +160,7 @@ def Migrate(content_file):
     else:
         article_type = "original"
         article_title = article_content
-        article_url = content_file.rsplit("/",1)[-1].replace(".txt", ".html").replace(" ", "-").replace("'","").lower()
+        article_url = content_file.replace(".txt", ".html").replace(" ", "-").replace("'","").lower()
         article_content = fd.readline()
 
     # Read the rest of the article's content from the file.
@@ -170,7 +169,7 @@ def Migrate(content_file):
 
     # Clear the target file, then write it's contents into it after the header information.
     fd = open(content_file, "w", encoding=ENCODING)
-    fd.write(f"Type: {article_type}\nTitle: {article_title.strip()}\nLink: {article_url.strip()}\nPubdate: {strftime('%Y/%m/%d %H:%M:%S', localtime(mtime))}\nAuthor: {config['byline']}\n\n{article_content.strip()}")
+    fd.write(f"Type: {article_type}\nTitle: {article_title.strip()}\nLink: {article_url.strip()}\nPubdate: {mod_time}\nAuthor: {config['byline']}\n\n{article_content.strip()}")
     fd.close()
 
     # Cleanup and revert the update time for the content file
@@ -214,7 +213,7 @@ def TestAndBuild(content_file,mtime):
     if ((isfile(f"./html/blog/{structure_file}")) and (mtime == stat(f"./html/blog/{structure_file}").st_mtime)): return True
 
     # Open input (content_fd), then open and clear output (structure_fd) file.
-    content_fd = open(f"{BASE_DIR}content/{content_file}", "r", encoding=ENCODING)
+    content_fd = open(f"{BASE_DIR}Content/{content_file}", "r", encoding=ENCODING)
     open(f"./html/blog/{structure_file}", "w", encoding=ENCODING).close()
     structure_fd = open(f"./html/blog/{structure_file}", "a", encoding=ENCODING)
 
@@ -223,8 +222,8 @@ def TestAndBuild(content_file,mtime):
     line = content_fd.readline()
     if ("Type: " not in line):
         content_fd.close()
-        Migrate(f"{BASE_DIR}content/{content_file}")
-        content_fd = open(f"{BASE_DIR}content/{content_file}", "r", encoding=ENCODING)
+        Migrate(content_file)
+        content_fd = open(f"{BASE_DIR}Content/{content_file}", "r", encoding=ENCODING)
     else:
         line = line.split(":", 1)
         header[line[0].lower()] = line[1].strip()
@@ -248,7 +247,7 @@ def TestAndBuild(content_file,mtime):
                 structure_fd.write(f"""<article>\n<h2 id='article_title'>\n<a class=\"original\" href=\"/blog/{structure_file}\">{header["title"]}</a>\n</h2>\n""")
             else:
                 structure_fd.write("<article>\n<h2 id='article_title'>\n<a class=\"linkpost\" href=\""+header["link"]+"\">"+header["title"]+"</a>\n</h2>\n")
-            structure_fd.write(f"""<time id='article_time' datetime="{mtime.tm_year}-{mtime.tm_mon:02}-{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02}-0400" pubdate="pubdate">By <link rel="author">{header["author"]}</link> on <a href="/blog/{mtime.tm_year}.html">{mtime.tm_year}</a>/<a href="/blog/{mtime.tm_year}-{mtime.tm_mon:02}.html">{mtime.tm_mon:02}</a>/{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02} EST</time>\n""")
+            structure_fd.write(f"""<time id='article_time' datetime="{mtime.tm_year}-{mtime.tm_mon}-{mtime.tm_mday} {mtime.tm_hour}:{mtime.tm_min}:{mtime.tm_sec}-0400" pubdate="pubdate">By <link rel="author">{header["author"]}</link> on <a href="/blog/{mtime.tm_year}.html">{mtime.tm_year}</a>/<a href="/blog/{mtime.tm_year}-{mtime.tm_mon if mtime.tm_mon > 9 else "0"+str(mtime.tm_mon)}.html">{mtime.tm_mon}</a>/{mtime.tm_mday} {mtime.tm_hour}:{mtime.tm_min}:{mtime.tm_sec} EST</time>\n""")
             structure_fd.write(md.html(line)+"\n")
         else:
             structure_fd.write(md.html(line)+"\n")
@@ -320,17 +319,18 @@ if (__name__ == "__main__"):
     results = []
 
     # Instantiate the multiprocessing orchestrator to use at most MAX_PROCESSES
-    pool = Pool(processes=MAX_PROCESSES)
+    orchestrator = ProcessPoolExecutor(max_workers=MAX_PROCESSES)
     
-    # Enumerate the "content" directory
-    for file in listdir(BASE_DIR+"content"):
+    # Enumerate the "Content" directory
+    for file in listdir(BASE_DIR+"Content"):
         if (file[-4:] != ".txt"): continue # Exclude non-text files
         stats["total_count"] += 1 # Increment total count
         
         # Get mod time, then test for existence and equivalence of structure
         # file with TestAndBuild. Multiprocessed.
-        mtime = stat(f"{BASE_DIR}content/{file}").st_mtime
-        results.append(pool.apply_async(TestAndBuild,(file,mtime)))
+        mtime = stat(f"{BASE_DIR}Content/{file}").st_mtime
+        # TestAndBuild(file,mtime)
+        results.append(orchestrator.submit(TestAndBuild,file,mtime))
 
         # Convert mtime to YYYY/MM/DD/HH:MM:SS format for dictionary indexing 
         mtime = strftime("%Y/%m/%d/%H:%M:%S", localtime(mtime)).split("/")
@@ -353,20 +353,20 @@ if (__name__ == "__main__"):
         files[mtime[0]][mtime[1]][mtime[2]][mtime[3]] = file
     
     # Wait for all article and static pages to build before proceeding
-    [x.wait() for x in results]
+    orchestrator.shutdown(wait=True)
 
     # Don't rebuild if nothing has changed
-    if (not all([x.get() for x in results])):
+    if (not all([x.result() for x in results])):
+        orchestrator = ProcessPoolExecutor(max_workers=MAX_PROCESSES)
 
         # Build index, projects, and disclaimers pages based on template files
         for file in listdir("./templates/"):
             if (file != "main.html"): # Exclude main template file
-                results.append(pool.apply_async(BuildFromTemplate,(file,file.split(".")[0].title())))
+                results.append(orchestrator.submit(BuildFromTemplate,file,file.split(".")[0].title()))
 
-        # # Build all year and month indexes
+        # Build all year and month indexes
         for year in files:
-            results.append(pool.apply_async(BuildByYear,(year,stats,files)))
-        [x.wait() for x in results]
+            results.append(orchestrator.submit(BuildByYear,year))
 
         # Build blog and archives pages, and RSS feed
         paragraphs = []
@@ -374,8 +374,8 @@ if (__name__ == "__main__"):
             for month in sorted(files[year], reverse=True):
                 for day in sorted(files[year][month], reverse=True):
                     for time in sorted(files[year][month][day], reverse=True):
-                        paragraphs.append(pool.apply_async(GetContent, args=(files[year][month][day][time])))
-        [x.wait() for x in paragraphs]
+                        paragraphs.append(orchestrator.submit(GetContent, files[year][month][day][time]))
+        orchestrator.shutdown(wait=True)
 
         # Clear blog, archives, and feed files, then write opening tags
         open("./html/blog.html", "w", encoding=ENCODING).close()
@@ -391,7 +391,7 @@ if (__name__ == "__main__"):
         
         # Add the first 32 posts to the home page, and the rest to the archive
         for i,each in enumerate(paragraphs):
-            each = each.get()
+            each = each.result()
             if (i < 32):
                 blog_fd.write(each[-1].replace("</article>", f"<p><a class='read_more_link' href='/blog/{each[3]}'>Read more</a><span class='logo'>&#x24E9;</span></p>\n</article>"))
             else:
@@ -417,8 +417,7 @@ if (__name__ == "__main__"):
         fd = open("./html/explore.html", "a", encoding=ENCODING)
         fd.write(template[0].replace("{{META_DESC}}", f"{config['byline']}'s Explore Page").replace("{{TITLE}}", "Explore", 2).replace("{{BODYID}}","explore",1))
         for each in choices(paragraphs, k=3):
-            each = each.get()
-            fd.write(each[-1])
+            fd.write(each.result()[-1])
         fd.write(template[1])
         fd.close()
 
