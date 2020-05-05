@@ -288,16 +288,21 @@ class Markdown:
         if (self.__line_type_tracker[-1] == "pre"):
             if (self.__pre == True):
                 if ("shell" in __line):
-                    return "<pre class='shell'>"
+                    # return "<pre class='shell'>"
+                    return "<div class='pre shell'>"
                 elif ("python" in __line):
-                    return "<pre class='python'>"
+                    # return "<pre class='python'>"
+                    return "<div class='pre python'>"
                 elif ("cmd" in __line):
-                    return "<pre class='cmd'>"
-                return "<pre>"
-            return "</pre>"
+                    # return "<pre class='cmd'>"
+                    return "<div class='pre cmd'>"
+                # return "<pre>"
+                return "<div class='pre'>"
+            # return "</pre>"
+            return "</div>"
 
         if (self.__pre == True):
-            return __line
+            return "<span class='pre_line_wrap'>"+__line.replace("<", "&lt;").replace(">", "&gt;").replace(" ", "&nbsp;")+"</span>"
 
         if (self.__line_type_tracker[-1] == "raw"):
             return __line

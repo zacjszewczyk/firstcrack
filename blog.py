@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
-# Imports
-from concurrent.futures import ProcessPoolExecutor # Multiprocessing
+# Imports 
+from multiprocessing import Pool # Multiprocessing
 from os import listdir, stat, mkdir, utime # File/folder operations
 from os.path import isfile, isdir # File/folder operations
 from time import localtime, strftime, strptime, mktime, gmtime # Mod time operations
@@ -16,7 +16,7 @@ from random import choices # Explore page
 ## MAX_PROCESSES: Process limit (Int)
 ## ENCODING: File system encoding (String)
 ## MONTHS: A map of month numbers to names (Dictionary)
-BASE_DIR = "/Users/zjszewczyk/Dropbox/Code/Standalone/"
+BASE_DIR = "./"
 MAX_PROCESSES = 16
 ENCODING = getpreferredencoding()
 MONTHS = {"01":"January","02":"February","03":"March","04":"April","05":"May","06":"June","07":"July","08":"August","09":"September","10":"October","11":"November","12":"December"}
@@ -25,8 +25,10 @@ MONTHS = {"01":"January","02":"February","03":"March","04":"April","05":"May","0
 # Purpose: Facilitate multiprocessing of year indexes
 # Parameters:
 # - year: Year index to build (String)
+# - stats: Content file stats by year/month/day/time (Dict)
+# - files: Content file names by year/month/day/time (Dict)
 # Return: True (Operation completes), False (Operation fails)
-def BuildByYear(year):
+def BuildByYear(year,stats,files):
     # For each year in which a post was made, generate a 'year' file, that
     # contains links to each month in which a post was published.
 
@@ -54,7 +56,7 @@ def BuildByYear(year):
         for day in sorted(files[year][month], reverse=True):
             # Sort the sub-dictionaries by keys, timestamps, then iterate over it
             for timestamp in sorted(files[year][month][day], reverse=True):
-                fd = open(BASE_DIR+"Content/"+files[year][month][day][timestamp], "r", encoding=ENCODING)
+                fd = open(BASE_DIR+"content/"+files[year][month][day][timestamp], "r", encoding=ENCODING)
                 article_title = fd.readlines()[1][7:]
                 fd.close()
                 # For each article made in the month, add an entry on the appropriate
@@ -102,16 +104,17 @@ def BuildFromTemplate(content_file,title):
 # Purpose: Get title, link, mod time, structure file, and first paragraph of
 # original post or entire linkpost.
 # Parameters:
-# - content_file: Target content file (String)
-# Return: [title, link, mtime, structure_file, content]
-def GetContent(content_file):
+# - content_file: Target content file (Character array)
+# Return: [title, link, mtime, structure_file, content] (List)
+def GetContent(*content_file):
+    content_file = "".join(content_file)
     structure_file = content_file.lower().replace(' ', '-')[0:-3]+'html'
     # Open structure file
     fd = open(f"./html/blog/{structure_file}", "r", encoding=ENCODING)
 
     # Skip to <article>
     for i,line in enumerate(fd):
-        if (line.strip() == "<article>"):
+        if ("<article" in line):
             break
 
     # Start recording content (content), and keep track of article type (t)
@@ -160,7 +163,7 @@ def Migrate(content_file):
     else:
         article_type = "original"
         article_title = article_content
-        article_url = content_file.replace(".txt", ".html").replace(" ", "-").replace("'","").lower()
+        article_url = content_file.rsplit("/",1)[-1].replace(".txt", ".html").replace(" ", "-").replace("'","").lower()
         article_content = fd.readline()
 
     # Read the rest of the article's content from the file.
@@ -169,32 +172,12 @@ def Migrate(content_file):
 
     # Clear the target file, then write it's contents into it after the header information.
     fd = open(content_file, "w", encoding=ENCODING)
-    fd.write(f"Type: {article_type}\nTitle: {article_title.strip()}\nLink: {article_url.strip()}\nPubdate: {mod_time}\nAuthor: {config['byline']}\n\n{article_content.strip()}")
+    fd.write(f"Type: {article_type}\nTitle: {article_title.strip()}\nLink: {article_url.strip()}\nPubdate: {strftime('%Y/%m/%d %H:%M:%S', localtime(mtime))}\nAuthor: {config['byline']}\n\n{article_content.strip()}")
     fd.close()
 
     # Cleanup and revert the update time for the content file
     del fd, article_content, article_title, article_url
     utime(content_file, (mtime,mtime))
-
-# Method: Revert
-# Purpose: Check file timestamp against article timestamp. Correct if necessary.
-# Parameters:
-# - content_file: Path to content file (String)
-def Revert(content_file):
-    fd = open(content_file, "r", encoding=ENCODING)
-    fd.readline()
-    fd.readline()
-    fd.readline()
-    mtime = mktime(strptime(fd.readline()[9:].strip(), "%Y/%m/%d %H:%M:%S"))
-    fd.close()
-
-    if (mod_time != stat(content_file).st_mtime):
-        print("Does not match for",content_file)
-        print("Reverting to",mtime)
-        utime(content_file, (mtime, mtime))
-
-    # Cleanup
-    del fd, mtime
 
 # Method: TestAndBuild
 # Purpose: Test for existence and equivalence of content and structure files,
@@ -213,7 +196,7 @@ def TestAndBuild(content_file,mtime):
     if ((isfile(f"./html/blog/{structure_file}")) and (mtime == stat(f"./html/blog/{structure_file}").st_mtime)): return True
 
     # Open input (content_fd), then open and clear output (structure_fd) file.
-    content_fd = open(f"{BASE_DIR}Content/{content_file}", "r", encoding=ENCODING)
+    content_fd = open(f"{BASE_DIR}content/{content_file}", "r", encoding=ENCODING)
     open(f"./html/blog/{structure_file}", "w", encoding=ENCODING).close()
     structure_fd = open(f"./html/blog/{structure_file}", "a", encoding=ENCODING)
 
@@ -222,8 +205,8 @@ def TestAndBuild(content_file,mtime):
     line = content_fd.readline()
     if ("Type: " not in line):
         content_fd.close()
-        Migrate(content_file)
-        content_fd = open(f"{BASE_DIR}Content/{content_file}", "r", encoding=ENCODING)
+        Migrate(f"{BASE_DIR}content/{content_file}")
+        content_fd = open(f"{BASE_DIR}content/{content_file}", "r", encoding=ENCODING)
     else:
         line = line.split(":", 1)
         header[line[0].lower()] = line[1].strip()
@@ -247,7 +230,7 @@ def TestAndBuild(content_file,mtime):
                 structure_fd.write(f"""<article>\n<h2 id='article_title'>\n<a class=\"original\" href=\"/blog/{structure_file}\">{header["title"]}</a>\n</h2>\n""")
             else:
                 structure_fd.write("<article>\n<h2 id='article_title'>\n<a class=\"linkpost\" href=\""+header["link"]+"\">"+header["title"]+"</a>\n</h2>\n")
-            structure_fd.write(f"""<time id='article_time' datetime="{mtime.tm_year}-{mtime.tm_mon}-{mtime.tm_mday} {mtime.tm_hour}:{mtime.tm_min}:{mtime.tm_sec}-0400" pubdate="pubdate">By <link rel="author">{header["author"]}</link> on <a href="/blog/{mtime.tm_year}.html">{mtime.tm_year}</a>/<a href="/blog/{mtime.tm_year}-{mtime.tm_mon if mtime.tm_mon > 9 else "0"+str(mtime.tm_mon)}.html">{mtime.tm_mon}</a>/{mtime.tm_mday} {mtime.tm_hour}:{mtime.tm_min}:{mtime.tm_sec} EST</time>\n""")
+            structure_fd.write(f"""<time id='article_time' datetime="{mtime.tm_year}-{mtime.tm_mon:02}-{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02}-0400" pubdate="pubdate">By <link rel="author">{header["author"]}</link> on <a href="/blog/{mtime.tm_year}.html">{mtime.tm_year}</a>/<a href="/blog/{mtime.tm_year}-{mtime.tm_mon:02}.html">{mtime.tm_mon:02}</a>/{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02} EST</time>\n""")
             structure_fd.write(md.html(line)+"\n")
         else:
             structure_fd.write(md.html(line)+"\n")
@@ -319,18 +302,17 @@ if (__name__ == "__main__"):
     results = []
 
     # Instantiate the multiprocessing orchestrator to use at most MAX_PROCESSES
-    orchestrator = ProcessPoolExecutor(max_workers=MAX_PROCESSES)
+    pool = Pool(processes=MAX_PROCESSES)
     
-    # Enumerate the "Content" directory
-    for file in listdir(BASE_DIR+"Content"):
+    # Enumerate the "content" directory
+    for file in listdir(BASE_DIR+"content"):
         if (file[-4:] != ".txt"): continue # Exclude non-text files
         stats["total_count"] += 1 # Increment total count
         
         # Get mod time, then test for existence and equivalence of structure
         # file with TestAndBuild. Multiprocessed.
-        mtime = stat(f"{BASE_DIR}Content/{file}").st_mtime
-        # TestAndBuild(file,mtime)
-        results.append(orchestrator.submit(TestAndBuild,file,mtime))
+        mtime = stat(f"{BASE_DIR}content/{file}").st_mtime
+        results.append(pool.apply_async(TestAndBuild,(file,mtime)))
 
         # Convert mtime to YYYY/MM/DD/HH:MM:SS format for dictionary indexing 
         mtime = strftime("%Y/%m/%d/%H:%M:%S", localtime(mtime)).split("/")
@@ -352,21 +334,19 @@ if (__name__ == "__main__"):
         stats[mtime[0]][mtime[1]][mtime[2]]["count"] += 1 # Add one to day count
         files[mtime[0]][mtime[1]][mtime[2]][mtime[3]] = file
     
-    # Wait for all article and static pages to build before proceeding
-    orchestrator.shutdown(wait=True)
+    # Wait for all article pages to build before proceeding
+    [x.wait() for x in results]
 
     # Don't rebuild if nothing has changed
-    if (not all([x.result() for x in results])):
-        orchestrator = ProcessPoolExecutor(max_workers=MAX_PROCESSES)
-
+    if (not all([x.get() for x in results])):
         # Build index, projects, and disclaimers pages based on template files
         for file in listdir("./templates/"):
             if (file != "main.html"): # Exclude main template file
-                results.append(orchestrator.submit(BuildFromTemplate,file,file.split(".")[0].title()))
+                results.append(pool.apply_async(BuildFromTemplate,(file,file.split(".")[0].title())))
 
         # Build all year and month indexes
         for year in files:
-            results.append(orchestrator.submit(BuildByYear,year))
+            results.append(pool.apply_async(BuildByYear,(year,stats,files)))
 
         # Build blog and archives pages, and RSS feed
         paragraphs = []
@@ -374,8 +354,7 @@ if (__name__ == "__main__"):
             for month in sorted(files[year], reverse=True):
                 for day in sorted(files[year][month], reverse=True):
                     for time in sorted(files[year][month][day], reverse=True):
-                        paragraphs.append(orchestrator.submit(GetContent, files[year][month][day][time]))
-        orchestrator.shutdown(wait=True)
+                        paragraphs.append(pool.apply_async(GetContent, args=(files[year][month][day][time])))
 
         # Clear blog, archives, and feed files, then write opening tags
         open("./html/blog.html", "w", encoding=ENCODING).close()
@@ -389,9 +368,12 @@ if (__name__ == "__main__"):
         feed_fd = open("./html/rss.xml", "a", encoding=ENCODING)
         feed_fd.write(f"""<?xml version='1.0' encoding='ISO-8859-1' ?>\n<rss version="2.0" xmlns:sy="http://purl.org/rss/1.0/modules/syndication/" xmlns:atom="http://www.w3.org/2005/Atom">\n<channel>\n    <title>{config['byline']}</title>\n    <link>{config['meta_baseurl']}</link>\n    <description>RSS feed for {config['byline']}'s website, found at {config['meta_baseurl']}/</description>\n    <language>en-us</language>\n    <copyright>Copyright 2012-2020, {config['byline']}. All rights reserved.</copyright>\n    <atom:link href="{config['meta_baseurl']}rss.xml" rel="self" type="application/rss+xml" />\n    <lastBuildDate>{datetime.utcnow().strftime("%a, %d %b %Y %I:%M:%S")} GMT</lastBuildDate>\n    <ttl>5</ttl>\n    <generator>First Crack</generator>\n""")
         
+        # Ensure conditions are set to build blog and archives pages, and feed
+        [x.wait() for x in paragraphs]
+
         # Add the first 32 posts to the home page, and the rest to the archive
         for i,each in enumerate(paragraphs):
-            each = each.result()
+            each = each.get()
             if (i < 32):
                 blog_fd.write(each[-1].replace("</article>", f"<p><a class='read_more_link' href='/blog/{each[3]}'>Read more</a><span class='logo'>&#x24E9;</span></p>\n</article>"))
             else:
@@ -403,7 +385,7 @@ if (__name__ == "__main__"):
             if ("<html>" in each[-1]): feed_fd.write(f"{' '*16}&lt;p&gt;This post must be viewed online.&lt;/p&gt;\n")
             else: feed_fd.write(f"{' '*16}"+'\n'.join(each[-1].split('\n')[5:-2]).replace('href=\"/','href=\"'+config["meta_baseurl"]).replace('src=\'/','src=\''+config["meta_baseurl"]).replace('<', '&lt;').replace('>', '&gt;')+"\n")
             feed_fd.write(f"{' '*12}</description>\n{' '*8}</item>\n")
-        
+
         # Write closing HTML/XML and close the files
         blog_fd.write(template[1])
         blog_fd.close()
@@ -417,9 +399,13 @@ if (__name__ == "__main__"):
         fd = open("./html/explore.html", "a", encoding=ENCODING)
         fd.write(template[0].replace("{{META_DESC}}", f"{config['byline']}'s Explore Page").replace("{{TITLE}}", "Explore", 2).replace("{{BODYID}}","explore",1))
         for each in choices(paragraphs, k=3):
-            fd.write(each.result()[-1])
+            each = each.get()
+            fd.write(each[-1])
         fd.write(template[1])
         fd.close()
+
+        # Ensure year and month indexes finished building before finishing.
+        [x.wait() for x in results]
 
     # Record end time
     t2 = datetime.now()
@@ -431,5 +417,5 @@ if (__name__ == "__main__"):
         print(f"-- Months: {sum([len(files[x]) for x in files])}")
         print(f"-- Days: {sum([sum(z) for z in [[len(files[x][y]) for y in files[x]] for x in files]])}")
         print(f"-- Posts: {stats['total_count']}")
-        if (all([x.result() for x in results])): print(f"{c.OKGREEN}No update necessary.{c.ENDC}")
+        if (all([x.get() for x in results])): print(f"{c.OKGREEN}No update necessary.{c.ENDC}")
         else: print(f"{c.WARNING}Site updated and rebuilt.{c.ENDC}")

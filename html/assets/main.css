@@ -5,7 +5,7 @@
 
 body { /** Create grid layout **/
 	display: grid;
-	grid-template-columns: minmax(1%,1fr) minmax(auto, 55em) minmax(1%,1fr);
+	grid-template-columns: minmax(2%,1fr) minmax(auto, 55em) minmax(2%,1fr);
 	grid-template-rows: min-content 1fr auto;
 	grid-template-areas:
 		"nav nav nav"
@@ -42,9 +42,11 @@ footer { /** Assign footer to third row **/
 		grid-template-columns: repeat(2,1fr);
 		grid-row-gap: 1em;
 		padding: 1em 0;
+		text-align:center;
 	}
 	nav a { /* Space nav elements */
 		padding: 0.1em;
+		margin: 0 .5em;
 	}
 	footer p { /* Increase footer line spacing */
 		line-height: 200% !important;
@@ -150,12 +152,36 @@ p {
 	margin: 1em 0;
 	line-height: 200%;
 }
-pre, code {
+.pre, code {
 	background-color: #F1F1F1;
 	font-family: "Courier New";
 	overflow: scroll;
+	white-space: nowrap;
 	border-radius: 0.5em;
 	padding: 1em;
+}
+.pre {
+    counter-reset: line;
+}
+.pre + .pre {
+	margin-top: 1em;
+}
+.pre_line_wrap {
+	display: block;
+	counter-increment: line;
+}
+.pre_line_wrap:before {
+    content: counter(line) "| ";
+    -webkit-user-select: none;
+}
+.shell .pre_line_wrap:before {
+	content: counter(line) "| $ ";
+}
+.python .pre_line_wrap:before {
+	content: counter(line) "| >>> ";
+}
+.cmd .pre_line_wrap:before {
+	content: counter(line) "| > ";
 }
 code {
 	padding: 0 .1em;
@@ -192,7 +218,7 @@ footer p {
 	body, nav, nav a, main, #lg, #rg, footer { /* Brown background for everything */
 		background-color: #2A1A0F;
 	}
-	pre, code { /* Light brown background for pre and code elements */
+	.pre, code { /* Light brown background for pre and code elements */
 		background-color: #422918;
 	}
 	a { /* Invert link / link highlight color and style */
