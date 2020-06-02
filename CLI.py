@@ -72,6 +72,9 @@ def DisplayInterface(params):
             params = GetUserInput("#: ")
         if ("-R" in params): # Rebuild all structure files
             print(" - Clearing structure files... ", end="", flush=True)
+            for file in listdir("./html"):
+                if (file.endswith(".html")):
+                    remove("./html/"+file)
             for file in listdir("./html/blog"):
                 if (file.endswith(".html")):
                     remove("./html/blog/"+file)

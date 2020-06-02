@@ -203,7 +203,7 @@ ul li, ol li {
 footer p {
 	text-align: center;
 	margin: .5em;
-	line-height: 100%;
+	line-height: 150%;
 }
 
 /** Dark mode **/

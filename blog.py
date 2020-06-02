@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Imports 
 from multiprocessing import Pool # Multiprocessing
@@ -130,6 +130,7 @@ def GetContent(*content_file):
             t = line.split("class=\"")[1].split("\" ")[0]
         elif (i == 3):
             mtime = line.split("datetime=\"")[1].split("\"",1)[0]
+            category = line.split(" in ")[1][9:].split("'")[0][1:]
         elif (t == "original" and i == 4): 
             content += "</article>\n"
             break
@@ -138,7 +139,7 @@ def GetContent(*content_file):
     # Close, clean, and return
     fd.close()
     del fd, t
-    return [title,link,mtime,structure_file,content]
+    return [title,link,mtime,category,structure_file,content]
 
 # Method: Migrate
 # Purpose: For files without the header information in their first five lines, generate
@@ -172,7 +173,7 @@ def Migrate(content_file):
 
     # Clear the target file, then write it's contents into it after the header information.
     fd = open(content_file, "w", encoding=ENCODING)
-    fd.write(f"Type: {article_type}\nTitle: {article_title.strip()}\nLink: {article_url.strip()}\nPubdate: {strftime('%Y/%m/%d %H:%M:%S', localtime(mtime))}\nAuthor: {config['byline']}\n\n{article_content.strip()}")
+    fd.write(f"Type: {article_type}\nTitle: {article_title.strip()}\nLink: {article_url.strip()}\nPubdate: {strftime('%Y/%m/%d %H:%M:%S', localtime(mtime))}\nCategory: Uncategorized\nAuthor: {config['byline']}\n\n{article_content.strip()}")
     fd.close()
 
     # Cleanup and revert the update time for the content file
@@ -230,7 +231,7 @@ def TestAndBuild(content_file,mtime):
                 structure_fd.write(f"""<article>\n<h2 id='article_title'>\n<a class=\"original\" href=\"/blog/{structure_file}\">{header["title"]}</a>\n</h2>\n""")
             else:
                 structure_fd.write("<article>\n<h2 id='article_title'>\n<a class=\"linkpost\" href=\""+header["link"]+"\">"+header["title"]+"</a>\n</h2>\n")
-            structure_fd.write(f"""<time id='article_time' datetime="{mtime.tm_year}-{mtime.tm_mon:02}-{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02}-0400" pubdate="pubdate">By <link rel="author">{header["author"]}</link> on <a href="/blog/{mtime.tm_year}.html">{mtime.tm_year}</a>/<a href="/blog/{mtime.tm_year}-{mtime.tm_mon:02}.html">{mtime.tm_mon:02}</a>/{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02} EST</time>\n""")
+            structure_fd.write(f"""<time id='article_time' datetime="{mtime.tm_year}-{mtime.tm_mon:02}-{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02}-0400" pubdate="pubdate">By <link rel="author">{header["author"]}</link> on <a href="/blog/{mtime.tm_year}.html">{mtime.tm_year}</a>/<a href="/blog/{mtime.tm_year}-{mtime.tm_mon:02}.html">{mtime.tm_mon:02}</a>/{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02} EST in <a href='/{header['category'].lower().replace(" ", "-")}.html'>{header['category']}</a></time>\n""")
             structure_fd.write(md.html(line)+"\n")
         else:
             structure_fd.write(md.html(line)+"\n")
@@ -371,22 +372,41 @@ if (__name__ == "__main__"):
         # Ensure conditions are set to build blog and archives pages, and feed
         [x.wait() for x in paragraphs]
 
-        # Add the first 32 posts to the home page, and the rest to the archive
+        # Add the first 32 posts to the home page, and the rest to the archive.
+        # Create individual category pages based on the posts' contents.
+        closeout = []
         for i,each in enumerate(paragraphs):
             each = each.get()
-            if (i < 32):
-                blog_fd.write(each[-1].replace("</article>", f"<p><a class='read_more_link' href='/blog/{each[3]}'>Read more</a><span class='logo'>&#x24E9;</span></p>\n</article>"))
+            # Conver to struct_time to include timestamp
+            mtime = strptime(each[2], '%Y-%m-%d %H:%M:%S-0400')
+
+            if (f"./html/{each[3]}" not in closeout):
+                closeout.append(f"./html/{each[3]}")
+                fd = open(f"./html/{each[3]}", "w", encoding=ENCODING)
+                fd.write(template[0].replace("{{META_DESC}}", f"{each[3][:-5]} Posts").replace("{{TITLE}}", f"{each[3][:-5].replace('-', ' ').title()} Posts", 2).replace("{{BODYID}}", each[3][:-5], 1)+"\n"+f"<article>\n    <h2>{each[3][:-5].replace('-', ' ').title()} Posts</h2>\n</article>\n")
+                fd.close()
             else:
-                archives_fd.write(each[-1].replace("</article>", f"<p><a class='read_more_link' href='/blog/{each[3]}'>Read more</a><span class='logo'>&#x24E9;</span></p>\n</article>"))
+                fd = open(f"./html/{each[3]}", "a", encoding=ENCODING)
+                fd.write(f"<article>\n    <p><a href=\"/blog/{mtime.tm_year}.html\">{mtime.tm_year}</a>/<a href=\"/blog/{mtime.tm_year}-{mtime.tm_mon:02}.html\">{mtime.tm_mon:02}</a>/{mtime.tm_mday:02} {mtime.tm_hour:02}:{mtime.tm_min:02}:{mtime.tm_sec:02} EST: <a href=\"/blog/{each[4]}\">{each[0]}</a></p>\n</article>\n")
+                fd.close()
+
+            if (i < 32):
+                blog_fd.write(each[-1].replace("</article>", f"<p><a class='read_more_link' href='/blog/{each[4]}'>Read more</a><span class='logo'>&#x24E9;</span></p>\n</article>"))
+            else:
+                archives_fd.write(each[-1].replace("</article>", f"<p><a class='read_more_link' href='/blog/{each[4]}'>Read more</a><span class='logo'>&#x24E9;</span></p>\n</article>"))
             
             each = [x.replace("&", "&amp;") for x in each]
             # Add all posts to the feed
-            feed_fd.write(f"{' '*8}<item>\n{' '*12}<title>{each[0]}</title>\n{' '*12}<link>{each[1] if each[1][0] != '/' else config['meta_baseurl']+each[1][1:]}</link>\n{' '*12}<guid isPermaLink='true'>{each[1] if each[1][0] != '/' else config['meta_baseurl']+each[1][1:]}</guid>\n{' '*12}<pubDate>{strftime('%a, %d %b %Y %H:%M:%S',gmtime(mktime(strptime(each[2], '%Y-%m-%d %H:%M:%S-0400'))))} GMT</pubDate>\n{' '*12}<description>\n")
+            feed_fd.write(f"{' '*8}<item>\n{' '*12}<title>{each[0]}</title>\n{' '*12}<link>{each[1] if each[1][0] != '/' else config['meta_baseurl']+each[1][1:]}</link>\n{' '*12}<guid isPermaLink='true'>{each[1] if each[1][0] != '/' else config['meta_baseurl']+each[1][1:]}</guid>\n{' '*12}<pubDate>{strftime('%a, %d %b %Y %H:%M:%S',gmtime(mktime(mtime)))} GMT</pubDate>\n{' '*12}<description>\n")
             if ("<html>" in each[-1]): feed_fd.write(f"{' '*16}&lt;p&gt;This post must be viewed online.&lt;/p&gt;\n")
-            else: feed_fd.write(f"{' '*16}"+'\n'.join(each[-1].split('\n')[5:-2]).replace('href=\"/','href=\"'+config["meta_baseurl"]).replace('src=\'/','src=\''+config["meta_baseurl"]).replace('<', '&lt;').replace('>', '&gt;')+"\n")
+            else: feed_fd.write(f"{' '*16}"+'\n'.join(each[-1].split('\n')[5:-2]).replace('href=\"/','href=\"'+config["meta_baseurl"]).replace('src=\'/','src=\''+config["meta_baseurl"]).replace('<', '&lt;').replace('>', '&gt;')+f"\n{' '*16}<p><a href=\"{config['meta_baseurl']}blog/{each[3]}\">Permalink.</a></p>\n".replace('<', '&lt;').replace('>', '&gt;'))
             feed_fd.write(f"{' '*12}</description>\n{' '*8}</item>\n")
 
         # Write closing HTML/XML and close the files
+        for each in closeout:
+            fd = open(each, "a", encoding=ENCODING)
+            fd.write(template[1])
+            fd.close()
         blog_fd.write(template[1])
         blog_fd.close()
         archives_fd.write(template[1])
