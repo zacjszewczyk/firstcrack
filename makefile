@@ -6,7 +6,7 @@
 .PHONY: help # Display help menu
 .PHONY: preview # Host local web server to preview local copy of website
 .PHONY: public # Host public web server to preview local copy of website
-.PHONY: deploy # Deploy to Google Firebase, and generate a generic commit message.
+.PHONY: deploy # Deploy to GitHub Pages, and generate a generic commit message.
 .PHONY: pull # Pull changes from remote source control repository.
 
 default: Config.json
@@ -16,9 +16,10 @@ verbose:
 cli:
 	@./blog.py -a
 rebuild:
-	@./blog.py -R
+	@./blog.py -R --exit
 timestamp:
-	@./blog.py -r
+	@./blog.py -r --exit
+	
 help:
 	@echo "make default   - Default rule. Update site."
 	@echo "make verbose   - Update site, with verbose output."
@@ -33,7 +34,7 @@ help:
 	@echo "                 \033[1mNote:\033[0m this web server is available to your entire network. Use"
 	@echo "                 to view your local website on other devices, and with caution."
 	@echo ""
-	@echo "make deploy    - Deploy to Google Firebase, and update source control."
+	@echo "make deploy    - Deploy to GitHub Pages, and update source control."
 	@echo "make pull      - Pull changes from remote source control repository."
 	@echo ""
 
@@ -43,10 +44,11 @@ public:
 	@./blog.py -P --exit
 
 deploy:
-	-@firebase deploy 2> /dev/null || echo `date`": No Firebase deployment found."
+	-@git add . && git subtree push --prefix=html https://github.com/zacjszewczyk/zacjszewczyk.github.io.git master 2> /dev/null || echo `date`": Unable to push to GitHub Pages repo."
 	-@(git add . 2> /dev/null && git commit -m "Deployment commit on `date`" && git push) || echo `date`": No local repo found."
 pull:
-	@git pll
+	@git subtree pull --prefix=html https://github.com/zacjszewczyk/zacjszewczyk.github.io.git master
+	@git pull
 
 Config.json:
 	@echo "First run detected. Please enter the following information:"
